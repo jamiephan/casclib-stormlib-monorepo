@@ -1,0 +1,57 @@
+{
+  "name": "@jamiephan/casclib",
+  "version": "1.0.0",
+  "description": "Node.js native bindings for CascLib - A library to read CASC storage from Blizzard games",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "install": "node ../../scripts/install.js",
+    "build": "tsc && node ../../scripts/generate-esm.js",
+    "rebuild": "node-gyp rebuild && pnpm build",
+    "clean": "node-gyp clean && rimraf dist",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "prepublishOnly": "pnpm rebuild"
+  },
+  "keywords": [
+    "casc",
+    "casclib",
+    "blizzard",
+    "storage",
+    "native",
+    "addon"
+  ],
+  "author": "jamiephan",
+  "license": "MIT",
+  "dependencies": {
+    "node-addon-api": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.11.0",
+    "jest": "^29.7.0",
+    "node-gyp": "^10.0.1",
+    "rimraf": "^5.0.5",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "gypfile": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "prebuilds/",
+    "build/Release/*.node",
+    "src/",
+    "binding.gyp",
+    "README.md"
+  ]
+}
