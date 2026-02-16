@@ -8,7 +8,7 @@ const TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS";
 describe("CascLib", () => {
   describe("CascStorageOnlineStorage", () => {
     let storage: CascStorage;
-    
+
     const TEST_ONLINE_STORAGE = `${TEMP_DIR}*hero*us`;
 
     beforeEach(() => {
@@ -43,41 +43,174 @@ describe("CascLib", () => {
 
     it("should list XML files (total file count > 1)", () => {
       storage.openOnline(TEST_ONLINE_STORAGE);
-      
+
       let fileCount = 0;
       const findData = storage.findFirstFile("*.xml");
-      
+
       if (findData) {
         fileCount++;
-        
+
         // Count additional files
         while (storage.findNextFile()) {
           fileCount++;
         }
-        
+
         storage.findClose();
       }
-      
+
       console.log("XML file count:", fileCount);
       expect(fileCount).toBeGreaterThan(1);
     });
 
     it("should read DataBuildId.txt and content should start with 'B'", () => {
       storage.openOnline(TEST_ONLINE_STORAGE);
-      
+
       const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
       expect(storage.fileExists(fileName)).toBe(true);
-      
+
       const file = storage.openFile(fileName);
       const content = file.readAll();
       const contentStr = content.toString("utf8");
-      
+
       console.log("DataBuildId.txt content:", contentStr);
       expect(contentStr.startsWith("B")).toBe(true);
-      
+
       file.close();
     });
 
+    it("should get file info for DataBuildId.txt", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+      const info = storage.getFileInfo(fileName);
+
+      expect(info).not.toBeNull();
+      expect(info).toHaveProperty("name");
+      expect(info).toHaveProperty("size");
+      expect(typeof info?.size).toBe("number");
+      expect(info?.size).toBeGreaterThan(0);
+      console.log("DataBuildId.txt info:", info);
+    });
+
+    it("should verify file does not exist for invalid path", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const invalidFileName = "non/existent/file.txt";
+      const exists = storage.fileExists(invalidFileName);
+
+      expect(exists).toBe(false);
+    });
+
+    it("should throw when opening non-existent file", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      expect(() => {
+        storage.openFile("non/existent/file.txt");
+      }).toThrow();
+    });
+
+    it("should read file in chunks", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+      const file = storage.openFile(fileName);
+
+      const chunk1 = file.read(5);
+      const chunk2 = file.read(5);
+
+      expect(Buffer.isBuffer(chunk1)).toBe(true);
+      expect(Buffer.isBuffer(chunk2)).toBe(true);
+      expect(chunk1.length).toBeLessThanOrEqual(5);
+      expect(chunk2.length).toBeLessThanOrEqual(5);
+
+      console.log("First chunk:", chunk1.toString("utf8"));
+      console.log("Second chunk:", chunk2.toString("utf8"));
+
+      file.close();
+    });
+
+    it("should handle file positioning", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+      const file = storage.openFile(fileName);
+      const size = file.getSize();
+
+      expect(size).toBeGreaterThan(0);
+
+      // Set position to middle of file
+      const midPos = Math.floor(size / 2);
+      file.setPosition(midPos);
+      const currentPos = file.getPosition();
+
+      expect(currentPos).toBe(midPos);
+
+      console.log("File size:", size, "Position:", currentPos);
+
+      file.close();
+    });
+
+    it("should list multiple file types", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const patterns = ["*.xml", "*.txt"];
+      const results: { [key: string]: number } = {};
+
+      for (const pattern of patterns) {
+        let count = 0;
+        const findData = storage.findFirstFile(pattern);
+
+        if (findData) {
+          count++;
+          while (storage.findNextFile()) {
+            count++;
+          }
+          storage.findClose();
+        }
+
+        results[pattern] = count;
+      }
+
+      console.log("File counts by pattern:", results);
+
+      // Expect at least some files for each pattern
+      expect(results["*.xml"]).toBeGreaterThan(0);
+      expect(results["*.txt"]).toBeGreaterThan(0);
+    });
+
+    it("should verify file size matches between getFileInfo and file.getSize", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+      const info = storage.getFileInfo(fileName);
+      const file = storage.openFile(fileName);
+      const fileSize = file.getSize();
+
+      expect(info?.size).toBe(fileSize);
+
+      console.log("Size from getFileInfo:", info?.size, "Size from file.getSize:", fileSize);
+
+      file.close();
+    });
+
+    it("should handle multiple sequential file operations", () => {
+      storage.openOnline(TEST_ONLINE_STORAGE);
+
+      const fileName = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+
+      // First operation
+      const file1 = storage.openFile(fileName);
+      const content1 = file1.readAll();
+      file1.close();
+
+      // Second operation
+      const file2 = storage.openFile(fileName);
+      const content2 = file2.readAll();
+      file2.close();
+
+      // Both should read the same content
+      expect(content1.equals(content2)).toBe(true);
+    });
   });
 
   describe("CascStorage", () => {
@@ -101,156 +234,6 @@ describe("CascLib", () => {
       expect(() => {
         storage.open("/non/existent/path");
       }).toThrow();
-    });
-
-    // Note: These tests require actual CASC storage to run
-    // You'll need to provide a test CASC storage path
-    describe("with valid storage", () => {
-      const TEST_STORAGE_PATH = process.env.TEST_CASC_PATH;
-
-      beforeEach(() => {
-        if (!TEST_STORAGE_PATH) {
-          console.warn("Skipping storage tests: TEST_CASC_PATH not set");
-          return;
-        }
-        if (!fs.existsSync(TEST_STORAGE_PATH)) {
-          console.warn(
-            `Skipping storage tests: ${TEST_STORAGE_PATH} does not exist`,
-          );
-          return;
-        }
-      });
-
-      it("should open storage successfully", () => {
-        if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-        expect(() => {
-          storage.open(TEST_STORAGE_PATH);
-        }).not.toThrow();
-      });
-
-      it("should close storage successfully", () => {
-        if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-        storage.open(TEST_STORAGE_PATH);
-        const result = storage.close();
-        expect(result).toBe(true);
-      });
-
-      it("should check if file exists", () => {
-        if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-        storage.open(TEST_STORAGE_PATH);
-        // This will depend on your test storage content
-        const exists = storage.fileExists("test-file.txt");
-        expect(typeof exists).toBe("boolean");
-      });
-
-      it("should get file info", () => {
-        if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-        storage.open(TEST_STORAGE_PATH);
-        const info = storage.getFileInfo("test-file.txt");
-
-        if (info) {
-          expect(info).toHaveProperty("name");
-          expect(info).toHaveProperty("size");
-          expect(typeof info.name).toBe("string");
-          expect(typeof info.size).toBe("number");
-        }
-      });
-    });
-  });
-
-  describe("CascFile", () => {
-    const TEST_STORAGE_PATH = process.env.TEST_CASC_PATH;
-    let storage: CascStorage;
-    let file: CascFile | null = null;
-
-    beforeEach(() => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) {
-        return;
-      }
-      storage = new CascStorage();
-      storage.open(TEST_STORAGE_PATH);
-    });
-
-    afterEach(() => {
-      if (file) {
-        file.close();
-        file = null;
-      }
-      if (storage) {
-        storage.close();
-      }
-    });
-
-    it("should open a file", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      // Adjust filename based on your test storage
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        expect(file).toBeInstanceOf(CascFile);
-      }
-    });
-
-    it("should read file content", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        const content = file.readAll();
-        expect(Buffer.isBuffer(content)).toBe(true);
-      }
-    });
-
-    it("should get file size", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        const size = file.getSize();
-        expect(typeof size).toBe("number");
-        expect(size).toBeGreaterThanOrEqual(0);
-      }
-    });
-
-    it("should read in chunks", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        const chunk = file.read(100);
-        expect(Buffer.isBuffer(chunk)).toBe(true);
-        expect(chunk.length).toBeLessThanOrEqual(100);
-      }
-    });
-
-    it("should handle file positioning", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        const size = file.getSize();
-
-        if (size > 10) {
-          file.setPosition(10);
-          const pos = file.getPosition();
-          expect(pos).toBe(10);
-        }
-      }
-    });
-
-    it("should close file successfully", () => {
-      if (!TEST_STORAGE_PATH || !fs.existsSync(TEST_STORAGE_PATH)) return;
-
-      if (storage.fileExists("test-file.txt")) {
-        file = storage.openFile("test-file.txt");
-        const result = file.close();
-        expect(result).toBe(true);
-        file = null;
-      }
     });
   });
 
