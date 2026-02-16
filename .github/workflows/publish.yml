@@ -63,26 +63,26 @@ jobs:
             node: 22
           
           # macOS x64 (Intel)
-          - os: macos-13
-            arch: x64
-            node: 18
-          - os: macos-13
-            arch: x64
-            node: 20
-          - os: macos-13
-            arch: x64
-            node: 22
+          # - os: macos-13
+          #   arch: x64
+          #   node: 18
+          # - os: macos-13
+          #   arch: x64
+          #   node: 20
+          # - os: macos-13
+          #   arch: x64
+          #   node: 22
           
           # macOS arm64 (Apple Silicon)
-          - os: macos-latest
-            arch: arm64
-            node: 18
-          - os: macos-latest
-            arch: arm64
-            node: 20
-          - os: macos-latest
-            arch: arm64
-            node: 22
+          # - os: macos-latest
+          #   arch: arm64
+          #   node: 18
+          # - os: macos-latest
+          #   arch: arm64
+          #   node: 20
+          # - os: macos-latest
+          #   arch: arm64
+          #   node: 22
 
     runs-on: ${{ matrix.os }}
 
