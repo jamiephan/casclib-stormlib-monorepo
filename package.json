@@ -10,8 +10,7 @@
     "build": "pnpm -r --stream build",
     "test": "pnpm -r --stream test",
     "clean": "pnpm -r --stream clean",
-    "rebuild": "pnpm -r --stream rebuild",
-    "install": "pnpm install"
+    "rebuild": "pnpm -r --stream rebuild"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
