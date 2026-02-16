@@ -6,6 +6,8 @@ on:
       - 'casclib/v*.*.*'
       - 'stormlib/v*.*.*'
 
+permissions:
+  id-token: write  # Required for OIDC
 jobs:
   # Extract package name and version from tag
   setup:
@@ -40,46 +42,12 @@ jobs:
     strategy:
       matrix:
         include:
-          # Linux x64
-          # - os: ubuntu-latest
-          #   arch: x64
-          #   node: 18
-          # - os: ubuntu-latest
-          #   arch: x64
-          #   node: 20
           - os: ubuntu-latest
             arch: x64
             node: 22
-          
-          # Windows x64
-          # - os: windows-latest
-          #   arch: x64
-          #   node: 18
-          # - os: windows-latest
-          #   arch: x64
-          #   node: 20
           - os: windows-latest
             arch: x64
             node: 22
-          
-          # macOS x64 (Intel)
-          # - os: macos-13
-          #   arch: x64
-          #   node: 18
-          # - os: macos-13
-          #   arch: x64
-          #   node: 20
-          # - os: macos-13
-          #   arch: x64
-          #   node: 22
-          
-          # macOS arm64 (Apple Silicon)
-          # - os: macos-latest
-          #   arch: arm64
-          #   node: 18
-          # - os: macos-latest
-          #   arch: arm64
-          #   node: 20
           - os: macos-latest
             arch: arm64
             node: 22
@@ -96,6 +64,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -144,7 +113,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
