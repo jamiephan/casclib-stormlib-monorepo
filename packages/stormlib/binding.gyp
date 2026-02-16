@@ -94,10 +94,6 @@
             ],
             "cflags_cc": [
               "-std=c++17"
-            ],
-            "libraries": [
-              "-lz",
-              "-lbz2"
             ]
           }
         ],
@@ -106,17 +102,14 @@
           {
             "defines": [
               "BZ_STRICT_ANSI",
-              "_7ZIP_ST"
+              "_7ZIP_ST",
+              "Z_SOLO=1"
             ],
             "xcode_settings": {
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
               "CLANG_CXX_LIBRARY": "libc++",
               "MACOSX_DEPLOYMENT_TARGET": "10.15"
-            },
-            "libraries": [
-              "-lz",
-              "-lbz2"
-            ]
+            }
           }
         ]
       ]

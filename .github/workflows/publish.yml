@@ -102,17 +102,6 @@ jobs:
         with:
           version: 8
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential zlib1g-dev libbz2-dev
-
-      - name: Install system dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install zlib bzip2
-
       - name: Install dependencies
         run: pnpm install
 
