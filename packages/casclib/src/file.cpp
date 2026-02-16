@@ -10,8 +10,13 @@ Napi::Object CascFile::Init(Napi::Env env, Napi::Object exports) {
     InstanceMethod("read", &CascFile::Read),
     InstanceMethod("readAll", &CascFile::ReadAll),
     InstanceMethod("getSize", &CascFile::GetSize),
+    InstanceMethod("getSize64", &CascFile::GetSize64),
     InstanceMethod("getPosition", &CascFile::GetPosition),
+    InstanceMethod("getPosition64", &CascFile::GetPosition64),
     InstanceMethod("setPosition", &CascFile::SetPosition),
+    InstanceMethod("setPosition64", &CascFile::SetPosition64),
+    InstanceMethod("getFileInfo", &CascFile::GetFileInfo),
+    InstanceMethod("setFileFlags", &CascFile::SetFileFlags),
     InstanceMethod("close", &CascFile::Close)
   });
 
@@ -159,4 +164,160 @@ Napi::Value CascFile::Close(const Napi::CallbackInfo& info) {
   }
 
   return Napi::Boolean::New(env, true);
+}
+
+Napi::Value CascFile::GetSize64(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  ULONGLONG fileSize = 0;
+  if (!CascGetFileSize64(hFile, &fileSize)) {
+    Napi::Error::New(env, "Failed to get file size")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Number::New(env, (double)fileSize);
+}
+
+Napi::Value CascFile::GetPosition64(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  ULONGLONG position = 0;
+  if (!CascSetFilePointer64(hFile, 0, &position, FILE_CURRENT)) {
+    Napi::Error::New(env, "Failed to get file position")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Number::New(env, (double)position);
+}
+
+Napi::Value CascFile::SetPosition64(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected position as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  LONGLONG position = (LONGLONG)info[0].As<Napi::Number>().Int64Value();
+  DWORD moveMethod = FILE_BEGIN;
+
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    moveMethod = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  ULONGLONG newPosition = 0;
+  if (!CascSetFilePointer64(hFile, position, &newPosition, moveMethod)) {
+    Napi::Error::New(env, "Failed to set file position")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Number::New(env, (double)newPosition);
+}
+
+Napi::Value CascFile::GetFileInfo(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected info class as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  CASC_FILE_INFO_CLASS infoClass = (CASC_FILE_INFO_CLASS)info[0].As<Napi::Number>().Uint32Value();
+  Napi::Object result = Napi::Object::New(env);
+
+  switch (infoClass) {
+    case CascFileContentKey: {
+      BYTE ckey[MD5_HASH_SIZE] = {0};
+      size_t bytesNeeded = 0;
+      if (CascGetFileInfo(hFile, infoClass, ckey, sizeof(ckey), &bytesNeeded)) {
+        result.Set("ckey", Napi::Buffer<BYTE>::Copy(env, ckey, MD5_HASH_SIZE));
+      }
+      break;
+    }
+    case CascFileEncodedKey: {
+      BYTE ekey[MD5_HASH_SIZE] = {0};
+      size_t bytesNeeded = 0;
+      if (CascGetFileInfo(hFile, infoClass, ekey, sizeof(ekey), &bytesNeeded)) {
+        result.Set("ekey", Napi::Buffer<BYTE>::Copy(env, ekey, MD5_HASH_SIZE));
+      }
+      break;
+    }
+    case CascFileFullInfo: {
+      CASC_FILE_FULL_INFO fullInfo = {0};
+      size_t bytesNeeded = 0;
+      if (CascGetFileInfo(hFile, infoClass, &fullInfo, sizeof(fullInfo), &bytesNeeded)) {
+        result.Set("ckey", Napi::Buffer<BYTE>::Copy(env, fullInfo.CKey, MD5_HASH_SIZE));
+        result.Set("ekey", Napi::Buffer<BYTE>::Copy(env, fullInfo.EKey, MD5_HASH_SIZE));
+        result.Set("dataFileName", Napi::String::New(env, fullInfo.DataFileName));
+        result.Set("storageOffset", Napi::Number::New(env, (double)fullInfo.StorageOffset));
+        result.Set("segmentOffset", Napi::Number::New(env, (double)fullInfo.SegmentOffset));
+        result.Set("tagBitMask", Napi::Number::New(env, (double)fullInfo.TagBitMask));
+        result.Set("fileNameHash", Napi::Number::New(env, (double)fullInfo.FileNameHash));
+        result.Set("contentSize", Napi::Number::New(env, (double)fullInfo.ContentSize));
+        result.Set("encodedSize", Napi::Number::New(env, (double)fullInfo.EncodedSize));
+        result.Set("segmentIndex", Napi::Number::New(env, fullInfo.SegmentIndex));
+        result.Set("spanCount", Napi::Number::New(env, fullInfo.SpanCount));
+        result.Set("fileDataId", Napi::Number::New(env, fullInfo.FileDataId));
+        result.Set("localeFlags", Napi::Number::New(env, fullInfo.LocaleFlags));
+        result.Set("contentFlags", Napi::Number::New(env, fullInfo.ContentFlags));
+      }
+      break;
+    }
+    default:
+      Napi::Error::New(env, "Unsupported info class")
+        .ThrowAsJavaScriptException();
+      return env.Null();
+  }
+
+  return result;
+}
+
+Napi::Value CascFile::SetFileFlags(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected flags as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  DWORD flags = info[0].As<Napi::Number>().Uint32Value();
+  bool result = CascSetFileFlags(hFile, flags);
+
+  return Napi::Boolean::New(env, result);
 }

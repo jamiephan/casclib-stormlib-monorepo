@@ -1,4 +1,4 @@
-import { Storage, File } from './bindings';
+import { Storage, File, FindData, StorageInfo, FileInfoResult } from './bindings';
 
 /**
  * Options for opening a CASC storage
@@ -47,6 +47,15 @@ export class CascStorage {
   }
 
   /**
+   * Open an online CASC storage
+   * @param path - URL or path to the online storage
+   * @param options - Optional opening options
+   */
+  openOnline(path: string, options?: StorageOpenOptions): void {
+    this.storage.openOnline(path, options?.flags || 0);
+  }
+
+  /**
    * Close the CASC storage
    */
   close(): boolean {
@@ -81,6 +90,96 @@ export class CascStorage {
   fileExists(filename: string): boolean {
     return this.storage.fileExists(filename);
   }
+
+  /**
+   * Get storage information
+   * @param infoClass - The type of information to retrieve
+   * @returns Storage information object
+   */
+  getStorageInfo(infoClass: number): StorageInfo {
+    return this.storage.getStorageInfo(infoClass);
+  }
+
+  /**
+   * Find the first file matching the mask
+   * @param mask - File mask (e.g., "*.txt")
+   * @param listFile - Optional list file path
+   * @returns Find data or null if no files found
+   */
+  findFirstFile(mask?: string, listFile?: string): FindData | null {
+    return this.storage.findFirstFile(mask, listFile);
+  }
+
+  /**
+   * Find the next file in the search
+   * @returns Find data or null if no more files
+   */
+  findNextFile(): FindData | null {
+    return this.storage.findNextFile();
+  }
+
+  /**
+   * Close the current find operation
+   * @returns true if closed successfully
+   */
+  findClose(): boolean {
+    return this.storage.findClose();
+  }
+
+  /**
+   * Add an encryption key to the storage
+   * @param keyName - Name/ID of the key
+   * @param key - Key data as Buffer
+   * @returns true if added successfully
+   */
+  addEncryptionKey(keyName: number, key: Buffer): boolean {
+    return this.storage.addEncryptionKey(keyName, key);
+  }
+
+  /**
+   * Add an encryption key from a string
+   * @param keyName - Name/ID of the key
+   * @param keyStr - Key as string
+   * @returns true if added successfully
+   */
+  addStringEncryptionKey(keyName: number, keyStr: string): boolean {
+    return this.storage.addStringEncryptionKey(keyName, keyStr);
+  }
+
+  /**
+   * Import encryption keys from a string
+   * @param keyList - String containing key list
+   * @returns true if imported successfully
+   */
+  importKeysFromString(keyList: string): boolean {
+    return this.storage.importKeysFromString(keyList);
+  }
+
+  /**
+   * Import encryption keys from a file
+   * @param filePath - Path to the key file
+   * @returns true if imported successfully
+   */
+  importKeysFromFile(filePath: string): boolean {
+    return this.storage.importKeysFromFile(filePath);
+  }
+
+  /**
+   * Find an encryption key by name
+   * @param keyName - Name/ID of the key
+   * @returns Key data or null if not found
+   */
+  findEncryptionKey(keyName: number): Buffer | null {
+    return this.storage.findEncryptionKey(keyName);
+  }
+
+  /**
+   * Get the name of an encryption key that was not found
+   * @returns Key name or null
+   */
+  getNotFoundEncryptionKey(): number | null {
+    return this.storage.getNotFoundEncryptionKey();
+  }
 }
 
 /**
@@ -112,7 +211,7 @@ export class CascFile {
   }
 
   /**
-   * Get the file size
+   * Get the file size (32-bit)
    * @returns File size in bytes
    */
   getSize(): number {
@@ -120,7 +219,15 @@ export class CascFile {
   }
 
   /**
-   * Get the current file position
+   * Get the file size (64-bit)
+   * @returns File size in bytes
+   */
+  getSize64(): number {
+    return this.file.getSize64();
+  }
+
+  /**
+   * Get the current file position (32-bit)
    * @returns Current position in bytes
    */
   getPosition(): number {
@@ -128,12 +235,48 @@ export class CascFile {
   }
 
   /**
-   * Set the file position
+   * Get the current file position (64-bit)
+   * @returns Current position in bytes
+   */
+  getPosition64(): number {
+    return this.file.getPosition64();
+  }
+
+  /**
+   * Set the file position (32-bit)
    * @param position - New position in bytes
    * @returns The new position
    */
   setPosition(position: number): number {
     return this.file.setPosition(position);
+  }
+
+  /**
+   * Set the file position (64-bit)
+   * @param position - New position in bytes
+   * @param moveMethod - Move method (FILE_BEGIN, FILE_CURRENT, FILE_END)
+   * @returns The new position
+   */
+  setPosition64(position: number, moveMethod?: number): number {
+    return this.file.setPosition64(position, moveMethod);
+  }
+
+  /**
+   * Get detailed file information
+   * @param infoClass - The type of information to retrieve
+   * @returns File information object
+   */
+  getFileInfo(infoClass: number): FileInfoResult {
+    return this.file.getFileInfo(infoClass);
+  }
+
+  /**
+   * Set file flags
+   * @param flags - Flags to set
+   * @returns true if set successfully
+   */
+  setFileFlags(flags: number): boolean {
+    return this.file.setFileFlags(flags);
   }
 
   /**
@@ -145,10 +288,12 @@ export class CascFile {
   }
 }
 
+// Re-export everything from bindings
+export * from './bindings';
+
 export { Storage, File };
 export default {
   CascStorage,
-  CascFile,
-  Storage,
-  File
+  CascFile
 };
+

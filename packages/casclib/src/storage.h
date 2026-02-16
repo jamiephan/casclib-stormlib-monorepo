@@ -15,14 +15,31 @@ private:
 
   // Methods
   Napi::Value Open(const Napi::CallbackInfo& info);
+  Napi::Value OpenOnline(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
   Napi::Value GetFileInfo(const Napi::CallbackInfo& info);
   Napi::Value FileExists(const Napi::CallbackInfo& info);
+  Napi::Value GetStorageInfo(const Napi::CallbackInfo& info);
+  
+  // Find methods
+  Napi::Value FindFirstFile(const Napi::CallbackInfo& info);
+  Napi::Value FindNextFile(const Napi::CallbackInfo& info);
+  Napi::Value FindClose(const Napi::CallbackInfo& info);
+  
+  // Encryption key methods
+  Napi::Value AddEncryptionKey(const Napi::CallbackInfo& info);
+  Napi::Value AddStringEncryptionKey(const Napi::CallbackInfo& info);
+  Napi::Value ImportKeysFromString(const Napi::CallbackInfo& info);
+  Napi::Value ImportKeysFromFile(const Napi::CallbackInfo& info);
+  Napi::Value FindEncryptionKey(const Napi::CallbackInfo& info);
+  Napi::Value GetNotFoundEncryptionKey(const Napi::CallbackInfo& info);
 
   // Member variables
   HANDLE hStorage;
+  HANDLE hFind;
   bool isOpen;
+  bool isFindOpen;
 };
 
 #endif // CASCLIB_STORAGE_H
