@@ -37,14 +37,34 @@ function isInDevelopment() {
 const buildDir = path.join(packageDir, 'build', 'Release');
 const outputPath = path.join(buildDir, `${packageName}.node`);
 
+// Helper function to build from source
+function buildFromSource() {
+  // Clean build directory to avoid stale files
+  const fullBuildDir = path.join(packageDir, 'build');
+  if (fs.existsSync(fullBuildDir)) {
+    console.log('Cleaning existing build directory...');
+    fs.rmSync(fullBuildDir, { recursive: true, force: true });
+  }
+  
+  // Configure and build
+  console.log('Configuring native module...');
+  execSync('npx node-gyp configure', { 
+    stdio: 'inherit',
+    cwd: packageDir
+  });
+  
+  console.log('Building native module...');
+  execSync('npx node-gyp build', { 
+    stdio: 'inherit',
+    cwd: packageDir
+  });
+}
+
 // In development mode, always build from source
 if (isInDevelopment()) {
   console.log('Development mode detected, building from source...');
   try {
-    execSync('npx node-gyp rebuild', { 
-      stdio: 'inherit',
-      cwd: packageDir
-    });
+    buildFromSource();
     console.log(`✓ ${packageName} built successfully from source`);
     process.exit(0);
   } catch (error) {
@@ -83,11 +103,8 @@ if (fs.existsSync(prebuildPath)) {
 
 // Fallback: Build from source
 try {
-  console.log('Running node-gyp rebuild...');
-  execSync('npx node-gyp rebuild', { 
-    stdio: 'inherit',
-    cwd: packageDir
-  });
+  console.log('Building from source as fallback...');
+  buildFromSource();
   console.log(`✓ ${packageName} built successfully from source`);
   process.exit(0);
 } catch (error) {
