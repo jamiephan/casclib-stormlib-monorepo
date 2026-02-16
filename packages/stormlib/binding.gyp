@@ -52,10 +52,8 @@
         "../../thirdparty/StormLib/src/zlib/trees.c",
         "../../thirdparty/StormLib/src/zlib/zutil.c",
         "../../thirdparty/StormLib/src/lzma/C/LzFind.c",
-        "../../thirdparty/StormLib/src/lzma/C/LzFindMt.c",
         "../../thirdparty/StormLib/src/lzma/C/LzmaDec.c",
         "../../thirdparty/StormLib/src/lzma/C/LzmaEnc.c",
-        "../../thirdparty/StormLib/src/lzma/C/Threads.c",
         "../../thirdparty/StormLib/src/LibTomMath.c",
         "../../thirdparty/StormLib/src/LibTomMathDesc.c",
         "../../thirdparty/StormLib/src/LibTomCrypt.c"
@@ -76,6 +74,10 @@
               "_WINDOWS",
               "WIN32"
             ],
+            "sources": [
+              "../../thirdparty/StormLib/src/lzma/C/LzFindMt.c",
+              "../../thirdparty/StormLib/src/lzma/C/Threads.c"
+            ],
             "msvs_settings": {
               "VCCLCompilerTool": {
                 "ExceptionHandling": 1
@@ -87,7 +89,8 @@
           "OS=='linux'",
           {
             "defines": [
-              "BZ_STRICT_ANSI"
+              "BZ_STRICT_ANSI",
+              "_7ZIP_ST"
             ],
             "cflags_cc": [
               "-std=c++17"
@@ -102,7 +105,8 @@
           "OS=='mac'",
           {
             "defines": [
-              "BZ_STRICT_ANSI"
+              "BZ_STRICT_ANSI",
+              "_7ZIP_ST"
             ],
             "xcode_settings": {
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",

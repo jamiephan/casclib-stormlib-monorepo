@@ -6,7 +6,6 @@ yarn.lock
 # Build outputs
 build/
 dist/
-lib/
 *.node
 
 # Prebuilds (committed to npm, but can be regenerated)
