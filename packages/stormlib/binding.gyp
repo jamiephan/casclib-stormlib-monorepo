@@ -86,6 +86,9 @@
         [
           "OS=='linux'",
           {
+            "defines": [
+              "BZ_STRICT_ANSI"
+            ],
             "cflags_cc": [
               "-std=c++17"
             ],
@@ -98,6 +101,9 @@
         [
           "OS=='mac'",
           {
+            "defines": [
+              "BZ_STRICT_ANSI"
+            ],
             "xcode_settings": {
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
               "CLANG_CXX_LIBRARY": "libc++",

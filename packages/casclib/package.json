@@ -14,7 +14,7 @@
   "scripts": {
     "install": "node-gyp-build",
     "build": "tsc && node ../../scripts/generate-esm.js",
-    "rebuild": "node-gyp rebuild && pnpm build",
+    "rebuild": "node-gyp-build && pnpm build",
     "prebuild": "prebuildify --napi --strip",
     "clean": "node-gyp clean && rimraf dist",
     "test": "jest",
