@@ -1,4 +1,4 @@
-import { Storage, File, FindData, StorageInfo, FileInfoResult } from './bindings';
+import { Storage, File, FindData, StorageInfo, FileInfoResult, CascNameType, OpenStorageExOptions } from './bindings';
 
 /**
  * Options for opening a CASC storage
@@ -43,7 +43,7 @@ export class CascStorage {
    * @param options - Optional opening options
    */
   open(path: string, options?: StorageOpenOptions): void {
-    this.storage.open(path, options?.flags || 0);
+    this.storage.openStorage(path, options?.flags || 0);
   }
 
   /**
@@ -52,14 +52,23 @@ export class CascStorage {
    * @param options - Optional opening options
    */
   openOnline(path: string, options?: StorageOpenOptions): void {
-    this.storage.openOnline(path, options?.flags || 0);
+    this.storage.openStorageOnline(path, options?.flags || 0);
+  }
+
+  /**
+   * Open a CASC storage with extended parameters (CascOpenStorageEx)
+   * @param params - Path or parameter string
+   * @param options - Extended opening options
+   */
+  openEx(params: string, options?: OpenStorageExOptions): void {
+    this.storage.openStorageEx(params, options);
   }
 
   /**
    * Close the CASC storage
    */
   close(): boolean {
-    return this.storage.close();
+    return this.storage.closeStorage();
   }
 
   /**
@@ -199,7 +208,7 @@ export class CascFile {
    * @returns Buffer containing the read data
    */
   read(bytesToRead?: number): Buffer {
-    return this.file.read(bytesToRead || 4096);
+    return this.file.readFile(bytesToRead || 4096);
   }
 
   /**
@@ -207,7 +216,7 @@ export class CascFile {
    * @returns Buffer containing all file data
    */
   readAll(): Buffer {
-    return this.file.readAll();
+    return this.file.readFileAll();
   }
 
   /**
@@ -215,7 +224,7 @@ export class CascFile {
    * @returns File size in bytes
    */
   getSize(): number {
-    return this.file.getSize();
+    return this.file.getFileSize();
   }
 
   /**
@@ -223,7 +232,7 @@ export class CascFile {
    * @returns File size in bytes
    */
   getSize64(): number {
-    return this.file.getSize64();
+    return this.file.getFileSize64();
   }
 
   /**
@@ -231,7 +240,7 @@ export class CascFile {
    * @returns Current position in bytes
    */
   getPosition(): number {
-    return this.file.getPosition();
+    return this.file.getFilePointer();
   }
 
   /**
@@ -239,7 +248,7 @@ export class CascFile {
    * @returns Current position in bytes
    */
   getPosition64(): number {
-    return this.file.getPosition64();
+    return this.file.getFilePointer64();
   }
 
   /**
@@ -248,7 +257,7 @@ export class CascFile {
    * @returns The new position
    */
   setPosition(position: number): number {
-    return this.file.setPosition(position);
+    return this.file.setFilePointer(position);
   }
 
   /**
@@ -258,7 +267,7 @@ export class CascFile {
    * @returns The new position
    */
   setPosition64(position: number, moveMethod?: number): number {
-    return this.file.setPosition64(position, moveMethod);
+    return this.file.setFilePointer64(position, moveMethod);
   }
 
   /**
@@ -284,14 +293,14 @@ export class CascFile {
    * @returns true if closed successfully
    */
   close(): boolean {
-    return this.file.close();
+    return this.file.closeFile();
   }
 }
 
 // Re-export everything from bindings
 export * from './bindings';
 
-export { Storage, File };
+export { Storage, File, CascNameType };
 export default {
   CascStorage,
   CascFile

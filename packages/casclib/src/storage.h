@@ -16,6 +16,7 @@ private:
   // Methods
   Napi::Value Open(const Napi::CallbackInfo& info);
   Napi::Value OpenOnline(const Napi::CallbackInfo& info);
+  Napi::Value OpenEx(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
   Napi::Value GetFileInfo(const Napi::CallbackInfo& info);

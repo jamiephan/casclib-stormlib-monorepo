@@ -8,9 +8,10 @@ Napi::Object CascStorage::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Storage", {
-    InstanceMethod("open", &CascStorage::Open),
-    InstanceMethod("openOnline", &CascStorage::OpenOnline),
-    InstanceMethod("close", &CascStorage::Close),
+    InstanceMethod("openStorage", &CascStorage::Open),
+    InstanceMethod("openStorageOnline", &CascStorage::OpenOnline),
+    InstanceMethod("openStorageEx", &CascStorage::OpenEx),
+    InstanceMethod("closeStorage", &CascStorage::Close),
     InstanceMethod("openFile", &CascStorage::OpenFile),
     InstanceMethod("getFileInfo", &CascStorage::GetFileInfo),
     InstanceMethod("fileExists", &CascStorage::FileExists),
@@ -243,6 +244,94 @@ Napi::Value CascStorage::OpenOnline(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(env, true);
 }
 
+Napi::Value CascStorage::OpenEx(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1) {
+    Napi::TypeError::New(env, "Expected at least params string as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (!info[0].IsString()) {
+    Napi::TypeError::New(env, "First argument must be a string")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (isOpen) {
+    Napi::Error::New(env, "Storage is already open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  std::string params = info[0].As<Napi::String>().Utf8Value();
+  
+  // Initialize CASC_OPEN_STORAGE_ARGS structure
+  CASC_OPEN_STORAGE_ARGS args = {0};
+  args.Size = sizeof(CASC_OPEN_STORAGE_ARGS);
+  args.dwLocaleMask = CASC_LOCALE_ALL;
+  args.dwFlags = 0;
+
+  bool bOnlineStorage = false;
+
+  // If second argument is an options object
+  if (info.Length() > 1 && info[1].IsObject()) {
+    Napi::Object options = info[1].As<Napi::Object>();
+
+    // Extract optional parameters
+    if (options.Has("localPath") && options.Get("localPath").IsString()) {
+      // LocalPath is stored temporarily - we'll use params for szLocalPath instead
+    }
+
+    if (options.Has("codeName") && options.Get("codeName").IsString()) {
+      static std::string codeName;
+      codeName = options.Get("codeName").As<Napi::String>().Utf8Value();
+      args.szCodeName = codeName.c_str();
+    }
+
+    if (options.Has("region") && options.Get("region").IsString()) {
+      static std::string region;
+      region = options.Get("region").As<Napi::String>().Utf8Value();
+      args.szRegion = region.c_str();
+    }
+
+    if (options.Has("localeMask") && options.Get("localeMask").IsNumber()) {
+      args.dwLocaleMask = options.Get("localeMask").As<Napi::Number>().Uint32Value();
+    }
+
+    if (options.Has("flags") && options.Get("flags").IsNumber()) {
+      args.dwFlags = options.Get("flags").As<Napi::Number>().Uint32Value();
+    }
+
+    if (options.Has("buildKey") && options.Get("buildKey").IsString()) {
+      static std::string buildKey;
+      buildKey = options.Get("buildKey").As<Napi::String>().Utf8Value();
+      args.szBuildKey = buildKey.c_str();
+    }
+
+    if (options.Has("cdnHostUrl") && options.Get("cdnHostUrl").IsString()) {
+      static std::string cdnHostUrl;
+      cdnHostUrl = options.Get("cdnHostUrl").As<Napi::String>().Utf8Value();
+      args.szCdnHostUrl = cdnHostUrl.c_str();
+    }
+
+    if (options.Has("online") && options.Get("online").IsBoolean()) {
+      bOnlineStorage = options.Get("online").As<Napi::Boolean>().Value();
+    }
+  }
+
+  // Call CascOpenStorageEx
+  if (!CascOpenStorageEx(params.c_str(), &args, bOnlineStorage, &hStorage)) {
+    std::string error = "Failed to open CASC storage with extended parameters: " + params;
+    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  isOpen = true;
+  return Napi::Boolean::New(env, true);
+}
+
 Napi::Value CascStorage::GetStorageInfo(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
 
@@ -332,11 +421,17 @@ Napi::Value CascStorage::FindFirstFile(const Napi::CallbackInfo& info) {
 
   Napi::Object result = Napi::Object::New(env);
   result.Set("fileName", Napi::String::New(env, findData.szFileName));
+  result.Set("ckey", Napi::Buffer<BYTE>::Copy(env, findData.CKey, MD5_HASH_SIZE));
+  result.Set("ekey", Napi::Buffer<BYTE>::Copy(env, findData.EKey, MD5_HASH_SIZE));
+  result.Set("tagBitMask", Napi::Number::New(env, (double)findData.TagBitMask));
   result.Set("fileSize", Napi::Number::New(env, (double)findData.FileSize));
+  result.Set("plainName", findData.szPlainName ? Napi::String::New(env, findData.szPlainName) : env.Null());
   result.Set("fileDataId", Napi::Number::New(env, findData.dwFileDataId));
   result.Set("localeFlags", Napi::Number::New(env, findData.dwLocaleFlags));
   result.Set("contentFlags", Napi::Number::New(env, findData.dwContentFlags));
+  result.Set("spanCount", Napi::Number::New(env, findData.dwSpanCount));
   result.Set("available", Napi::Boolean::New(env, findData.bFileAvailable));
+  result.Set("nameType", Napi::Number::New(env, findData.NameType));
 
   return result;
 }
@@ -357,11 +452,17 @@ Napi::Value CascStorage::FindNextFile(const Napi::CallbackInfo& info) {
 
   Napi::Object result = Napi::Object::New(env);
   result.Set("fileName", Napi::String::New(env, findData.szFileName));
+  result.Set("ckey", Napi::Buffer<BYTE>::Copy(env, findData.CKey, MD5_HASH_SIZE));
+  result.Set("ekey", Napi::Buffer<BYTE>::Copy(env, findData.EKey, MD5_HASH_SIZE));
+  result.Set("tagBitMask", Napi::Number::New(env, (double)findData.TagBitMask));
   result.Set("fileSize", Napi::Number::New(env, (double)findData.FileSize));
+  result.Set("plainName", findData.szPlainName ? Napi::String::New(env, findData.szPlainName) : env.Null());
   result.Set("fileDataId", Napi::Number::New(env, findData.dwFileDataId));
   result.Set("localeFlags", Napi::Number::New(env, findData.dwLocaleFlags));
   result.Set("contentFlags", Napi::Number::New(env, findData.dwContentFlags));
+  result.Set("spanCount", Napi::Number::New(env, findData.dwSpanCount));
   result.Set("available", Napi::Boolean::New(env, findData.bFileAvailable));
+  result.Set("nameType", Napi::Number::New(env, findData.NameType));
 
   return result;
 }

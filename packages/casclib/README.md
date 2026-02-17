@@ -2,6 +2,26 @@
 
 Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib) - A library to read CASC (Content Addressable Storage Container) from modern Blizzard games.
 
+## Features
+
+- ✅ Read CASC storage archives (local and online)
+- ✅ Extract files from modern Blizzard games
+- ✅ TypeScript support with full type definitions
+- ✅ Cross-platform (Windows, macOS, Linux)
+- ✅ Both CommonJS and ES Module support
+- ✅ High-level wrapper API for ease of use
+- ✅ Low-level bindings for advanced usage
+
+## Supported Games
+
+Any game using CASC storage format, including:
+- Heroes of the Storm
+- World of Warcraft
+- Diablo III & IV
+- Overwatch
+- Starcraft II
+- Warcraft III: Reforged
+
 ## Installation
 
 ```bash
@@ -13,6 +33,17 @@ Or with pnpm:
 ```bash
 pnpm add @jamiephan/casclib
 ```
+
+## Architecture
+
+This package provides two layers of API:
+
+1. **High-level Wrapper API** (Recommended) - `CascStorage` and `CascFile` classes with simplified method names
+2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with explicit naming
+
+Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings follow a strict naming convention where C++ functions like `CascOpenStorageEx` map to `openStorageEx` in the bindings.
+
+For more details, see [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md).
 
 ## Usage
 
@@ -26,6 +57,9 @@ import { CascStorage, CascFile } from '@jamiephan/casclib';
 
 // CommonJS
 const { CascStorage, CascFile } = require('@jamiephan/casclib');
+
+// Advanced: Direct binding access
+import { Storage, File } from '@jamiephan/casclib';
 ```
 
 ### Opening a CASC Storage
@@ -535,6 +569,9 @@ interface FileInfo {
 interface FindData {
   fileName: string;
   fileSize: number;
+  localeFlags: number;
+  fileDataId: number;
+  contentFlags: number;
   // ... additional fields
 }
 
@@ -544,6 +581,67 @@ interface StorageInfo {
 
 interface FileInfoResult {
   // File-specific information
+}
+```
+
+## Advanced Usage
+
+### Direct Binding Access
+
+For advanced users who need direct access to the native bindings:
+
+```typescript
+import { Storage, File } from '@jamiephan/casclib';
+import * as constants from '@jamiephan/casclib';
+
+const storage = new Storage();
+storage.openStorage('/path/to/storage', 0);
+
+const file = storage.openFile('filename.txt', constants.CASC_OPEN_BY_NAME);
+const size = file.getFileSize64();
+const content = file.readFileAll();
+file.closeFile();
+
+storage.closeStorage();
+```
+
+### Binding Naming Convention
+
+The low-level bindings follow this pattern:
+- C++ function: `CascOpenStorageEx` → JS binding: `openStorageEx`
+- C++ function: `CascGetFileSize64` → JS binding: `getFileSize64`
+
+The high-level wrapper simplifies these names further:
+- Binding: `openStorageEx` → Wrapper: `openEx()`
+- Binding: `getFileSize64` → Wrapper: `getSize64()`
+
+See [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md) for complete details.
+
+## Performance Tips
+
+1. **Use `readAll()` for small files**: More efficient than multiple `read()` calls
+2. **Use `read(size)` for large files**: Better memory management for streaming
+3. **Close files and storage**: Always close resources when done to prevent memory leaks
+4. **Online storage caching**: First access downloads data to temp directory for better subsequent performance
+
+## Error Handling
+
+All methods that can fail will throw exceptions. Always use try-catch blocks:
+
+```typescript
+try {
+  const storage = new CascStorage();
+  storage.open('/path/to/storage');
+  
+  if (storage.fileExists('some-file.txt')) {
+    const file = storage.openFile('some-file.txt');
+    const content = file.readAll();
+    file.close();
+  }
+  
+  storage.close();
+} catch (error) {
+  console.error('Error processing storage:', error);
 }
 ```
 

@@ -21,14 +21,28 @@ export enum FileInfoClass {
   SpanInfo = 3
 }
 
+// Name type enum
+export enum CascNameType {
+  Full = 0,
+  DataId = 1,
+  CKey = 2,
+  EKey = 3
+}
+
 // Find data structure
 export interface FindData {
   fileName: string;
+  ckey: Buffer;
+  ekey: Buffer;
+  tagBitMask: number;
   fileSize: number;
+  plainName: string | null;
   fileDataId: number;
   localeFlags: number;
   contentFlags: number;
+  spanCount: number;
   available: boolean;
+  nameType: CascNameType;
 }
 
 // Storage product info
@@ -63,6 +77,18 @@ export interface FileFullInfo {
   contentFlags: number;
 }
 
+// File span info
+export interface FileSpanInfo {
+  ckey: Buffer;
+  ekey: Buffer;
+  startOffset: number;
+  endOffset: number;
+  archiveIndex: number;
+  archiveOffs: number;
+  headerSize: number;
+  frameCount: number;
+}
+
 // File info result
 export interface FileInfoResult {
   ckey?: Buffer;
@@ -81,11 +107,23 @@ export interface FileInfoResult {
   contentFlags?: number;
 }
 
+export interface OpenStorageExOptions {
+  localPath?: string;
+  codeName?: string;
+  region?: string;
+  localeMask?: number;
+  flags?: number;
+  buildKey?: string;
+  cdnHostUrl?: string;
+  online?: boolean;
+}
+
 export interface Storage {
   // Basic operations
-  open(path: string, flags: number): boolean;
-  openOnline(path: string, flags: number): boolean;
-  close(): boolean;
+  openStorage(path: string, flags: number): boolean;
+  openStorageOnline(path: string, flags: number): boolean;
+  openStorageEx(params: string, options?: OpenStorageExOptions): boolean;
+  closeStorage(): boolean;
   
   // File operations
   openFile(filename: string, flags: number): File;
@@ -111,25 +149,25 @@ export interface Storage {
 
 export interface File {
   // Basic read operations
-  read(bytesToRead: number): Buffer;
-  readAll(): Buffer;
+  readFile(bytesToRead: number): Buffer;
+  readFileAll(): Buffer;
   
   // Size operations
-  getSize(): number;
-  getSize64(): number;
+  getFileSize(): number;
+  getFileSize64(): number;
   
   // Position operations
-  getPosition(): number;
-  getPosition64(): number;
-  setPosition(position: number): number;
-  setPosition64(position: number, moveMethod?: number): number;
+  getFilePointer(): number;
+  getFilePointer64(): number;
+  setFilePointer(position: number): number;
+  setFilePointer64(position: number, moveMethod?: number): number;
   
   // File info and flags
   getFileInfo(infoClass: number): FileInfoResult;
   setFileFlags(flags: number): boolean;
   
   // Close
-  close(): boolean;
+  closeFile(): boolean;
 }
 
 export const Storage: new () => Storage = bindings.Storage;
@@ -140,25 +178,62 @@ export const openLocalFile: (filename: string, flags?: number) => File = binding
 export const getError: () => number = bindings.getError;
 export const setError: (error: number) => void = bindings.setError;
 
+// CDN functions
+export const cdnGetDefault: () => string | null = bindings.cdnGetDefault;
+export const cdnDownload: (cdnHostUrl: string, product: string, fileName: string) => Buffer | null = bindings.cdnDownload;
+
+// Version constants
+export const CASCLIB_VERSION: number = bindings.CASCLIB_VERSION || 0x0300;
+export const CASCLIB_VERSION_STRING: string = "3.0";
+
+// File positioning constants
+export const FILE_BEGIN: number = bindings.FILE_BEGIN;
+export const FILE_CURRENT: number = bindings.FILE_CURRENT;
+export const FILE_END: number = bindings.FILE_END;
+
+// Other useful constants
+export const CASC_FILEID_FORMAT: string = bindings.CASC_FILEID_FORMAT;
+export const CASC_PARAM_SEPARATOR: string = bindings.CASC_PARAM_SEPARATOR;
+
+// Progress message constants
+export const CascProgressLoadingFile: number = bindings.CascProgressLoadingFile;
+export const CascProgressLoadingManifest: number = bindings.CascProgressLoadingManifest;
+export const CascProgressDownloadingFile: number = bindings.CascProgressDownloadingFile;
+export const CascProgressLoadingIndexes: number = bindings.CascProgressLoadingIndexes;
+export const CascProgressDownloadingArchiveIndexes: number = bindings.CascProgressDownloadingArchiveIndexes;
+
 // Open flags
 export const CASC_OPEN_BY_NAME: number = bindings.CASC_OPEN_BY_NAME;
 export const CASC_OPEN_BY_CKEY: number = bindings.CASC_OPEN_BY_CKEY;
 export const CASC_OPEN_BY_EKEY: number = bindings.CASC_OPEN_BY_EKEY;
 export const CASC_OPEN_BY_FILEID: number = bindings.CASC_OPEN_BY_FILEID;
+export const CASC_OPEN_TYPE_MASK: number = bindings.CASC_OPEN_TYPE_MASK;
+export const CASC_OPEN_FLAGS_MASK: number = bindings.CASC_OPEN_FLAGS_MASK;
 export const CASC_STRICT_DATA_CHECK: number = bindings.CASC_STRICT_DATA_CHECK;
 export const CASC_OVERCOME_ENCRYPTED: number = bindings.CASC_OVERCOME_ENCRYPTED;
+export const CASC_OPEN_CKEY_ONCE: number = bindings.CASC_OPEN_CKEY_ONCE;
 
 // Locale flags
 export const CASC_LOCALE_ALL: number = bindings.CASC_LOCALE_ALL;
+export const CASC_LOCALE_ALL_WOW: number = bindings.CASC_LOCALE_ALL_WOW;
 export const CASC_LOCALE_NONE: number = bindings.CASC_LOCALE_NONE;
+export const CASC_LOCALE_UNKNOWN1: number = bindings.CASC_LOCALE_UNKNOWN1;
 export const CASC_LOCALE_ENUS: number = bindings.CASC_LOCALE_ENUS;
 export const CASC_LOCALE_KOKR: number = bindings.CASC_LOCALE_KOKR;
+export const CASC_LOCALE_RESERVED: number = bindings.CASC_LOCALE_RESERVED;
 export const CASC_LOCALE_FRFR: number = bindings.CASC_LOCALE_FRFR;
 export const CASC_LOCALE_DEDE: number = bindings.CASC_LOCALE_DEDE;
 export const CASC_LOCALE_ZHCN: number = bindings.CASC_LOCALE_ZHCN;
 export const CASC_LOCALE_ESES: number = bindings.CASC_LOCALE_ESES;
 export const CASC_LOCALE_ZHTW: number = bindings.CASC_LOCALE_ZHTW;
 export const CASC_LOCALE_ENGB: number = bindings.CASC_LOCALE_ENGB;
+export const CASC_LOCALE_ENCN: number = bindings.CASC_LOCALE_ENCN;
+export const CASC_LOCALE_ENTW: number = bindings.CASC_LOCALE_ENTW;
+export const CASC_LOCALE_ESMX: number = bindings.CASC_LOCALE_ESMX;
+export const CASC_LOCALE_RURU: number = bindings.CASC_LOCALE_RURU;
+export const CASC_LOCALE_PTBR: number = bindings.CASC_LOCALE_PTBR;
+export const CASC_LOCALE_ITIT: number = bindings.CASC_LOCALE_ITIT;
+export const CASC_LOCALE_PTPT: number = bindings.CASC_LOCALE_PTPT;
 
 // Content flags
 export const CASC_CFLAG_INSTALL: number = bindings.CASC_CFLAG_INSTALL;
@@ -166,25 +241,59 @@ export const CASC_CFLAG_LOAD_ON_WINDOWS: number = bindings.CASC_CFLAG_LOAD_ON_WI
 export const CASC_CFLAG_LOAD_ON_MAC: number = bindings.CASC_CFLAG_LOAD_ON_MAC;
 export const CASC_CFLAG_X86_32: number = bindings.CASC_CFLAG_X86_32;
 export const CASC_CFLAG_X86_64: number = bindings.CASC_CFLAG_X86_64;
+export const CASC_CFLAG_LOW_VIOLENCE: number = bindings.CASC_CFLAG_LOW_VIOLENCE;
+export const CASC_CFLAG_DONT_LOAD: number = bindings.CASC_CFLAG_DONT_LOAD;
+export const CASC_CFLAG_UPDATE_PLUGIN: number = bindings.CASC_CFLAG_UPDATE_PLUGIN;
+export const CASC_CFLAG_ARM64: number = bindings.CASC_CFLAG_ARM64;
 export const CASC_CFLAG_ENCRYPTED: number = bindings.CASC_CFLAG_ENCRYPTED;
+export const CASC_CFLAG_NO_NAME_HASH: number = bindings.CASC_CFLAG_NO_NAME_HASH;
+export const CASC_CFLAG_UNCMN_RESOLUTION: number = bindings.CASC_CFLAG_UNCMN_RESOLUTION;
+export const CASC_CFLAG_BUNDLE: number = bindings.CASC_CFLAG_BUNDLE;
+export const CASC_CFLAG_NO_COMPRESSION: number = bindings.CASC_CFLAG_NO_COMPRESSION;
+
+// Hash sizes
+export const MD5_HASH_SIZE: number = bindings.MD5_HASH_SIZE;
+export const MD5_STRING_SIZE: number = bindings.MD5_STRING_SIZE;
+export const SHA1_HASH_SIZE: number = bindings.SHA1_HASH_SIZE;
+export const SHA1_STRING_SIZE: number = bindings.SHA1_STRING_SIZE;
+
+// Invalid values
+export const CASC_INVALID_INDEX: number = bindings.CASC_INVALID_INDEX;
+export const CASC_INVALID_SIZE: number = bindings.CASC_INVALID_SIZE;
+export const CASC_INVALID_POS: number = bindings.CASC_INVALID_POS;
+export const CASC_INVALID_ID: number = bindings.CASC_INVALID_ID;
+export const CASC_INVALID_OFFS64: number = bindings.CASC_INVALID_OFFS64;
+export const CASC_INVALID_SIZE64: number = bindings.CASC_INVALID_SIZE64;
 
 // Storage info constants
 export const CascStorageLocalFileCount: number = bindings.CascStorageLocalFileCount;
 export const CascStorageTotalFileCount: number = bindings.CascStorageTotalFileCount;
 export const CascStorageFeatures: number = bindings.CascStorageFeatures;
+export const CascStorageInstalledLocales: number = bindings.CascStorageInstalledLocales;
 export const CascStorageProduct: number = bindings.CascStorageProduct;
+export const CascStorageTags: number = bindings.CascStorageTags;
+export const CascStoragePathProduct: number = bindings.CascStoragePathProduct;
 
 // File info constants
 export const CascFileContentKey: number = bindings.CascFileContentKey;
 export const CascFileEncodedKey: number = bindings.CascFileEncodedKey;
 export const CascFileFullInfo: number = bindings.CascFileFullInfo;
+export const CascFileSpanInfo: number = bindings.CascFileSpanInfo;
 
 // Feature flags
 export const CASC_FEATURE_FILE_NAMES: number = bindings.CASC_FEATURE_FILE_NAMES;
 export const CASC_FEATURE_ROOT_CKEY: number = bindings.CASC_FEATURE_ROOT_CKEY;
 export const CASC_FEATURE_TAGS: number = bindings.CASC_FEATURE_TAGS;
+export const CASC_FEATURE_FNAME_HASHES: number = bindings.CASC_FEATURE_FNAME_HASHES;
+export const CASC_FEATURE_FNAME_HASHES_OPTIONAL: number = bindings.CASC_FEATURE_FNAME_HASHES_OPTIONAL;
 export const CASC_FEATURE_FILE_DATA_IDS: number = bindings.CASC_FEATURE_FILE_DATA_IDS;
 export const CASC_FEATURE_LOCALE_FLAGS: number = bindings.CASC_FEATURE_LOCALE_FLAGS;
 export const CASC_FEATURE_CONTENT_FLAGS: number = bindings.CASC_FEATURE_CONTENT_FLAGS;
+export const CASC_FEATURE_DATA_ARCHIVES: number = bindings.CASC_FEATURE_DATA_ARCHIVES;
+export const CASC_FEATURE_DATA_FILES: number = bindings.CASC_FEATURE_DATA_FILES;
 export const CASC_FEATURE_ONLINE: number = bindings.CASC_FEATURE_ONLINE;
+export const CASC_FEATURE_FORCE_DOWNLOAD: number = bindings.CASC_FEATURE_FORCE_DOWNLOAD;
+
+// Key length
+export const CASC_KEY_LENGTH: number = bindings.CASC_KEY_LENGTH;
 

@@ -7,17 +7,17 @@ Napi::Object CascFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "File", {
-    InstanceMethod("read", &CascFile::Read),
-    InstanceMethod("readAll", &CascFile::ReadAll),
-    InstanceMethod("getSize", &CascFile::GetSize),
-    InstanceMethod("getSize64", &CascFile::GetSize64),
-    InstanceMethod("getPosition", &CascFile::GetPosition),
-    InstanceMethod("getPosition64", &CascFile::GetPosition64),
-    InstanceMethod("setPosition", &CascFile::SetPosition),
-    InstanceMethod("setPosition64", &CascFile::SetPosition64),
+    InstanceMethod("readFile", &CascFile::Read),
+    InstanceMethod("readFileAll", &CascFile::ReadAll),
+    InstanceMethod("getFileSize", &CascFile::GetSize),
+    InstanceMethod("getFileSize64", &CascFile::GetSize64),
+    InstanceMethod("getFilePointer", &CascFile::GetPosition),
+    InstanceMethod("getFilePointer64", &CascFile::GetPosition64),
+    InstanceMethod("setFilePointer", &CascFile::SetPosition),
+    InstanceMethod("setFilePointer64", &CascFile::SetPosition64),
     InstanceMethod("getFileInfo", &CascFile::GetFileInfo),
     InstanceMethod("setFileFlags", &CascFile::SetFileFlags),
-    InstanceMethod("close", &CascFile::Close)
+    InstanceMethod("closeFile", &CascFile::Close)
   });
 
   constructor = Napi::Persistent(func);
