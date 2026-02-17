@@ -1,6 +1,6 @@
 {
   "name": "@jamiephan/stormlib",
-  "version": "0.0.0-dev.0",
+  "version": "0.0.0-dev.1",
   "description": "Node.js native bindings for StormLib - A library to read and write MPQ archives from Blizzard games",
   "repository": {
     "type": "git",
