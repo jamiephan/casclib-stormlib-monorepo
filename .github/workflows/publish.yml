@@ -175,7 +175,10 @@ jobs:
             # Default to next for other prereleases
             echo "tag=next" >> $GITHUB_OUTPUT
           fi
-
+          
+      - name: Update npm
+        run: npm install -g npm@latest
+        
       - name: Publish to npm
         working-directory: packages/${{ needs.setup.outputs.package }}
         run: npm publish --provenance --access public --tag ${{ steps.npm-tag.outputs.tag }}
