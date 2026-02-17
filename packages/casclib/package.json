@@ -2,6 +2,10 @@
   "name": "@jamiephan/casclib",
   "version": "0.0.0-dev.0",
   "description": "Node.js native bindings for CascLib - A library to read CASC storage from Blizzard games",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jamiephan/casclib-stormlib-monorepo.git"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
