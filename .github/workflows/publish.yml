@@ -3,8 +3,8 @@ name: Publish Package with Prebuilds
 on:
   push:
     tags:
-      - 'casclib/v*.*.*'
-      - 'stormlib/v*.*.*'
+      - 'casclib/v*'
+      - 'stormlib/v*'
 
 permissions:
   id-token: write  # Required for OIDC
@@ -17,6 +17,7 @@ jobs:
       package: ${{ steps.parse.outputs.package }}
       version: ${{ steps.parse.outputs.version }}
       tag: ${{ steps.parse.outputs.tag }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
     steps:
       - name: Parse tag
         id: parse
@@ -31,6 +32,15 @@ jobs:
           # Extract version (remove 'v' prefix)
           VERSION=$(echo $TAG | cut -d'/' -f2 | sed 's/^v//')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Detect if prerelease (contains - or +)
+          if [[ "$VERSION" =~ [+-] ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Prerelease: true"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "Prerelease: false"
+          fi
           
           echo "Package: $PACKAGE"
           echo "Version: $VERSION"
@@ -150,39 +160,51 @@ jobs:
           echo "Available prebuilds:"
           find packages/${{ needs.setup.outputs.package }}/prebuilds -name "*.node" -o -name "*.json"
 
-      - name: Update package version
-        working-directory: packages/${{ needs.setup.outputs.package }}
+      - name: Determine npm tag
+        id: npm-tag
         run: |
-          npm version ${{ needs.setup.outputs.version }} --no-git-tag-version --allow-same-version
+          VERSION="${{ needs.setup.outputs.version }}"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Clean version like 1.0.0 - use latest tag
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" =~ -([a-zA-Z]+) ]]; then
+            # Extract prerelease identifier (e.g., dev, alpha, beta)
+            TAG="${BASH_REMATCH[1]}"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          else
+            # Default to next for other prereleases
+            echo "tag=next" >> $GITHUB_OUTPUT
+          fi
 
       - name: Publish to npm
         working-directory: packages/${{ needs.setup.outputs.package }}
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public --tag ${{ steps.npm-tag.outputs.tag }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ needs.setup.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
           name: '@jamiephan/${{ needs.setup.outputs.package }} v${{ needs.setup.outputs.version }}'
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.setup.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
           body: |
             # @jamiephan/${{ needs.setup.outputs.package }} v${{ needs.setup.outputs.version }}
+            
+            ${{ needs.setup.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
 
             ## 📦 Installation
             ```bash
             npm install @jamiephan/${{ needs.setup.outputs.package }}@${{ needs.setup.outputs.version }}
             ```
+            
+            ${{ needs.setup.outputs.is_prerelease == 'true' && format('Or install with the tag:\n```bash\nnpm install @jamiephan/{0}@{1}\n```\n', needs.setup.outputs.package, steps.npm-tag.outputs.tag) || '' }}
 
             ## 🔧 Supported Platforms
             This release includes prebuilt binaries for:
-            - **Linux (x64)** - Node.js 18, 20, 22
-            - **Windows (x64)** - Node.js 18, 20, 22
-            - **macOS Intel (x64)** - Node.js 18, 20, 22
-            - **macOS Apple Silicon (arm64)** - Node.js 18, 20, 22
+            - **Linux (x64)** - Node.js 22
+            - **Windows (x64)** - Node.js 22
+            - **macOS Apple Silicon (arm64)** - Node.js 22
 
             If your platform is not listed, the package will build from source automatically.
 
