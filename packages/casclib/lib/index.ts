@@ -48,8 +48,32 @@ export class CascStorage {
 
   /**
    * Open an online CASC storage
-   * @param path - URL or path to the online storage
+   * @param path - Connection string in the format: `local_cache_folder[*cdn_server_url]*code_name[*region]`
+   *   - `local_cache_folder`: Local cache directory for downloaded game data (reusable)
+   *     - Windows: `C:/Temp/CASC/Cache`
+   *     - Linux/macOS: `/tmp/casc/cache`
+   *   - `cdn_server_url`: Optional CDN server URL (e.g., "http://us.patch.battle.net:1119")
+   *   - `code_name`: TACT product code (e.g., "hero" for Heroes of the Storm, "wow" for World of Warcraft)
+   *     See https://wowdev.wiki/TACT for available product codes
+   *   - `region`: Optional server region (e.g., "us", "eu", "kr", "tw", "cn")
    * @param options - Optional opening options
+   * @example
+   * ```typescript
+   * // Windows - Basic usage with minimal parameters
+   * storage.openOnline('C:/Temp/CASC/Cache*hero');
+   * 
+   * // Linux/macOS - Basic usage
+   * storage.openOnline('/tmp/casc/cache*hero');
+   * 
+   * // With CDN server specified
+   * storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero');
+   * 
+   * // With region specified
+   * storage.openOnline('/tmp/casc/cache*hero*us');
+   * 
+   * // Full format with all parameters
+   * storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero*us');
+   * ```
    */
   openOnline(path: string, options?: StorageOpenOptions): void {
     this.storage.openStorageOnline(path, options?.flags || 0);

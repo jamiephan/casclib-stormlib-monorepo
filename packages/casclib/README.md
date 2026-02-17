@@ -107,8 +107,23 @@ file.close();
 
 ```typescript
 // Connect to online CASC storage
+// Format: local_cache_folder[*cdn_server_url]*code_name[*region]
 const storage = new CascStorage();
-storage.openOnline('http://us.patch.battle.net:1119/hero');
+
+// Windows - Basic usage with cache folder and product code
+storage.openOnline('C:/Temp/CASC/Cache*hero');
+
+// Linux/macOS - Basic usage
+storage.openOnline('/tmp/casc/cache*hero');
+
+// With CDN server specified
+storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero');
+
+// With region specified (uses default CDN)
+storage.openOnline('/tmp/casc/cache*hero*us');
+
+// Full format with all parameters
+storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero*us');
 
 if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/UI/Layout.xml')) {
   const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/UI/Layout.xml');
@@ -220,12 +235,35 @@ storage.open('/path/to/heroes/HeroesData', { flags: 0 });
 Opens an online CASC storage.
 
 **Parameters:**
-- `path`: URL to the online storage
+- `path`: Connection string in the format: `local_cache_folder[*cdn_server_url]*code_name[*region]`
+  - `local_cache_folder`: Local cache directory for downloaded game data (reusable across runs)
+    - Windows: `C:/Temp/CASC/Cache`
+    - Linux/macOS: `/tmp/casc/cache`
+  - `cdn_server_url`: Optional CDN server URL (e.g., `http://us.patch.battle.net:1119`). If omitted, uses default CDN
+  - `code_name`: TACT product code - see [TACT documentation](https://wowdev.wiki/TACT) for available codes
+    - Examples: `hero` (Heroes of the Storm), `wow` (World of Warcraft), `s2` (StarCraft II), `d3` (Diablo III)
+  - `region`: Optional server region (e.g., `us`, `eu`, `kr`, `tw`, `cn`). If omitted, defaults to `us`
 - `options`: Optional opening options
 
-**Example:**
+**Examples:**
 ```typescript
-storage.openOnline('http://us.patch.battle.net:1119/hero');
+// Windows - Minimal format: cache folder and product code
+storage.openOnline('C:/Temp/CASC/Cache*hero');
+
+// Linux/macOS - Minimal format
+storage.openOnline('/tmp/casc/cache*hero');
+
+// With CDN server specified
+storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero');
+
+// With region specified (uses default CDN)
+storage.openOnline('/tmp/casc/cache*hero*us');
+
+// Full format with all parameters
+storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero*us');
+
+// World of Warcraft EU region
+storage.openOnline('/tmp/casc/cache*wow*eu');
 ```
 
 ##### `close(): boolean`
