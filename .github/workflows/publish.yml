@@ -55,9 +55,9 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             node: 22
-          # - os: windows-latest
-          #   arch: x64
-          #   node: 22
+          - os: windows-latest
+            arch: x64
+            node: 22
           # - os: macos-latest
           #   arch: arm64
           #   node: 22
@@ -191,44 +191,29 @@ jobs:
           draft: false
           prerelease: ${{ needs.setup.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
-          body: |
-            # @jamiephan/${{ needs.setup.outputs.package }} v${{ needs.setup.outputs.version }}
-            
+          body: |            
             ${{ needs.setup.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
 
-            ## 📦 Installation
+            ## Installation
             ```bash
             npm install @jamiephan/${{ needs.setup.outputs.package }}@${{ needs.setup.outputs.version }}
             ```
             
-            ${{ needs.setup.outputs.is_prerelease == 'true' && format('Or install with the tag:\n```bash\nnpm install @jamiephan/{0}@{1}\n```\n', needs.setup.outputs.package, steps.npm-tag.outputs.tag) || '' }}
+            ${{ needs.setup.outputs.is_prerelease == 'true' && format('Or install with the npm tag: `npm install @jamiephan/{0}@{1}`', needs.setup.outputs.package, steps.npm-tag.outputs.tag) || '' }}
 
-            ## 🔧 Supported Platforms
-            This release includes prebuilt binaries for:
+            ## Supported Platforms
+            This release includes prebuilt N-API binaries for:
             - **Linux (x64)** - Node.js 22
             - **Windows (x64)** - Node.js 22
             - **macOS Apple Silicon (arm64)** - Node.js 22
 
             If your platform is not listed, the package will build from source automatically.
 
-            ## 📝 Package Contents
-            - ✅ Native module prebuilds
-            - ✅ TypeScript definitions
-            - ✅ ES Module & CommonJS support
+            ## Documentation
+            For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/stormlib/v${{ needs.setup.outputs.version }}/packages/${{ needs.setup.outputs.package }}/README.md).
 
-            ## 🚀 Quick Start
-            ```javascript
-            // CommonJS
-            const { ${{ needs.setup.outputs.package }} } = require('@jamiephan/${{ needs.setup.outputs.package }}');
-
-            // ES Module
-            import { ${{ needs.setup.outputs.package }} } from '@jamiephan/${{ needs.setup.outputs.package }}';
-            ```
-
-            ---
-            *Prebuilt binaries ensure fast installation without requiring build tools!*
-          files: |
-            packages/${{ needs.setup.outputs.package }}/prebuilds/**/*
+          # files: |
+          #   packages/${{ needs.setup.outputs.package }}/prebuilds/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
