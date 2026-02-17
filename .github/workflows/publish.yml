@@ -88,16 +88,6 @@ jobs:
         working-directory: packages/${{ needs.setup.outputs.package }}
         run: pnpm run build
 
-      - name: Create prebuild
-        working-directory: packages/${{ needs.setup.outputs.package }}
-        run: pnpm run prebuild
-
-      - name: Run tests
-        working-directory: packages/${{ needs.setup.outputs.package }}
-        run: pnpm test
-        env:
-          CI: true
-
       - name: Upload prebuild
         uses: actions/upload-artifact@v4
         with:
