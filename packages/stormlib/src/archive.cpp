@@ -8,17 +8,26 @@ Napi::Object MpqArchive::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Archive", {
-    InstanceMethod("open", &MpqArchive::Open),
-    InstanceMethod("create", &MpqArchive::Create),
-    InstanceMethod("close", &MpqArchive::Close),
-    InstanceMethod("openFile", &MpqArchive::OpenFile),
+    InstanceMethod("openArchive", &MpqArchive::Open),
+    InstanceMethod("createArchive", &MpqArchive::Create),
+    InstanceMethod("closeArchive", &MpqArchive::Close),
+    InstanceMethod("flushArchive", &MpqArchive::Flush),
+    InstanceMethod("compactArchive", &MpqArchive::Compact),
+    InstanceMethod("openFileEx", &MpqArchive::OpenFile),
     InstanceMethod("hasFile", &MpqArchive::HasFile),
     InstanceMethod("extractFile", &MpqArchive::ExtractFile),
     InstanceMethod("addFile", &MpqArchive::AddFile),
+    InstanceMethod("addFileEx", &MpqArchive::AddFileEx),
     InstanceMethod("removeFile", &MpqArchive::RemoveFile),
     InstanceMethod("renameFile", &MpqArchive::RenameFile),
-    InstanceMethod("compact", &MpqArchive::Compact),
-    InstanceMethod("getMaxFileCount", &MpqArchive::GetMaxFileCount)
+    InstanceMethod("getMaxFileCount", &MpqArchive::GetMaxFileCount),
+    InstanceMethod("setMaxFileCount", &MpqArchive::SetMaxFileCount),
+    InstanceMethod("getAttributes", &MpqArchive::GetAttributes),
+    InstanceMethod("setAttributes", &MpqArchive::SetAttributes),
+    InstanceMethod("verifyFile", &MpqArchive::VerifyFile),
+    InstanceMethod("verifyArchive", &MpqArchive::VerifyArchive),
+    StaticMethod("getLocale", &MpqArchive::GetLocale),
+    StaticMethod("setLocale", &MpqArchive::SetLocale)
   });
 
   constructor = Napi::Persistent(func);
@@ -329,4 +338,188 @@ Napi::Value MpqArchive::GetMaxFileCount(const Napi::CallbackInfo& info) {
   SFileGetFileInfo(hMpq, SFileMpqHashTableSize, &maxFileCount, sizeof(maxFileCount), nullptr);
 
   return Napi::Number::New(env, maxFileCount);
+}
+
+Napi::Value MpqArchive::Flush(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (!SFileFlushArchive(hMpq)) {
+    Napi::Error::New(env, "Failed to flush archive")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::SetMaxFileCount(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected max file count as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  DWORD maxFileCount = info[0].As<Napi::Number>().Uint32Value();
+
+  if (!SFileSetMaxFileCount(hMpq, maxFileCount)) {
+    Napi::Error::New(env, "Failed to set max file count")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::GetAttributes(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  DWORD attributes = SFileGetAttributes(hMpq);
+  return Napi::Number::New(env, attributes);
+}
+
+Napi::Value MpqArchive::SetAttributes(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected attributes flags as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  DWORD attributes = info[0].As<Napi::Number>().Uint32Value();
+
+  if (!SFileSetAttributes(hMpq, attributes)) {
+    Napi::Error::New(env, "Failed to set attributes")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::AddFileEx(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
+    Napi::TypeError::New(env, "Expected source path and archive name")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  std::string source = info[0].As<Napi::String>().Utf8Value();
+  std::string archiveName = info[1].As<Napi::String>().Utf8Value();
+  DWORD flags = MPQ_FILE_COMPRESS | MPQ_FILE_ENCRYPTED;
+  DWORD compression = MPQ_COMPRESSION_ZLIB;
+  DWORD compressionNext = MPQ_COMPRESSION_ZLIB;
+
+  if (info.Length() > 2 && info[2].IsNumber()) {
+    flags = info[2].As<Napi::Number>().Uint32Value();
+  }
+
+  if (info.Length() > 3 && info[3].IsNumber()) {
+    compression = info[3].As<Napi::Number>().Uint32Value();
+  }
+
+  if (info.Length() > 4 && info[4].IsNumber()) {
+    compressionNext = info[4].As<Napi::Number>().Uint32Value();
+  }
+
+  if (!SFileAddFileEx(hMpq, source.c_str(), archiveName.c_str(), flags, compression, compressionNext)) {
+    std::string error = "Failed to add file: " + source;
+    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::VerifyFile(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    Napi::TypeError::New(env, "Expected filename as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  std::string filename = info[0].As<Napi::String>().Utf8Value();
+  DWORD flags = 0x0000000F; // SFILE_VERIFY_ALL
+
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    flags = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  DWORD result = SFileVerifyFile(hMpq, filename.c_str(), flags);
+  return Napi::Number::New(env, result);
+}
+
+Napi::Value MpqArchive::VerifyArchive(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  DWORD result = SFileVerifyArchive(hMpq);
+  return Napi::Number::New(env, result);
+}
+
+Napi::Value MpqArchive::GetLocale(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  LCID locale = SFileGetLocale();
+  return Napi::Number::New(env, locale);
+}
+
+Napi::Value MpqArchive::SetLocale(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected locale as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  LCID newLocale = info[0].As<Napi::Number>().Uint32Value();
+  LCID oldLocale = SFileSetLocale(newLocale);
+  return Napi::Number::New(env, oldLocale);
 }

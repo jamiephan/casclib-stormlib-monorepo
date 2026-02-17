@@ -13,18 +13,35 @@ public:
 private:
   static Napi::FunctionReference constructor;
 
-  // Methods
+  // Archive operations
   Napi::Value Open(const Napi::CallbackInfo& info);
   Napi::Value Create(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
+  Napi::Value Flush(const Napi::CallbackInfo& info);
+  Napi::Value Compact(const Napi::CallbackInfo& info);
+
+  // File operations
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
   Napi::Value HasFile(const Napi::CallbackInfo& info);
   Napi::Value ExtractFile(const Napi::CallbackInfo& info);
   Napi::Value AddFile(const Napi::CallbackInfo& info);
+  Napi::Value AddFileEx(const Napi::CallbackInfo& info);
   Napi::Value RemoveFile(const Napi::CallbackInfo& info);
   Napi::Value RenameFile(const Napi::CallbackInfo& info);
-  Napi::Value Compact(const Napi::CallbackInfo& info);
+  
+  // Archive info
   Napi::Value GetMaxFileCount(const Napi::CallbackInfo& info);
+  Napi::Value SetMaxFileCount(const Napi::CallbackInfo& info);
+  Napi::Value GetAttributes(const Napi::CallbackInfo& info);
+  Napi::Value SetAttributes(const Napi::CallbackInfo& info);
+  
+  // Verification
+  Napi::Value VerifyFile(const Napi::CallbackInfo& info);
+  Napi::Value VerifyArchive(const Napi::CallbackInfo& info);
+
+  // Static locale methods
+  static Napi::Value GetLocale(const Napi::CallbackInfo& info);
+  static Napi::Value SetLocale(const Napi::CallbackInfo& info);
 
   // Member variables
   HANDLE hMpq;

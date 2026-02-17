@@ -1,5 +1,8 @@
 import { Archive, File } from './bindings';
 
+// Re-export all constants
+export * from './constants';
+
 /**
  * Options for opening an MPQ archive
  */
@@ -32,6 +35,10 @@ export interface FileOpenOptions {
 export interface AddFileOptions {
   /** File flags (compression, encryption, etc.) */
   flags?: number;
+  /** Compression method for first sector */
+  compression?: number;
+  /** Compression method for subsequent sectors */
+  compressionNext?: number;
 }
 
 /**
@@ -46,12 +53,30 @@ export class MpqArchive {
   }
 
   /**
+   * Get the current locale setting
+   * This is a static method that affects all archive operations
+   */
+  static getLocale(): number {
+    return Archive.getLocale();
+  }
+
+  /**
+   * Set the locale for archive operations
+   * This is a static method that affects all archive operations
+   * @param locale - The locale ID to set
+   * @returns The previous locale ID
+   */
+  static setLocale(locale: number): number {
+    return Archive.setLocale(locale);
+  }
+
+  /**
    * Open an MPQ archive at the specified path
    * @param path - Path to the MPQ archive file
    * @param options - Optional opening options
    */
   open(path: string, options?: ArchiveOpenOptions): void {
-    this.archive.open(path, options?.flags || 0);
+    this.archive.openArchive(path, options?.flags || 0);
   }
 
   /**
@@ -60,14 +85,30 @@ export class MpqArchive {
    * @param options - Optional creation options
    */
   create(path: string, options?: ArchiveCreateOptions): void {
-    this.archive.create(path, options?.maxFileCount || 1000, options?.flags || 0);
+    this.archive.createArchive(path, options?.maxFileCount || 1000, options?.flags || 0);
   }
 
   /**
    * Close the MPQ archive
    */
   close(): boolean {
-    return this.archive.close();
+    return this.archive.closeArchive();
+  }
+
+  /**
+   * Flush any pending changes to disk
+   * @returns true if successful
+   */
+  flush(): boolean {
+    return this.archive.flushArchive();
+  }
+
+  /**
+   * Compact the archive to remove unused space
+   * @returns true if successful
+   */
+  compact(): boolean {
+    return this.archive.compactArchive();
   }
 
   /**
@@ -77,7 +118,7 @@ export class MpqArchive {
    * @returns An MpqFile object
    */
   openFile(filename: string, options?: FileOpenOptions): MpqFile {
-    const file = this.archive.openFile(filename, options?.flags || 0);
+    const file = this.archive.openFileEx(filename, options?.flags || 0);
     return new MpqFile(file);
   }
 
@@ -94,24 +135,55 @@ export class MpqArchive {
    * Extract a file from the archive to disk
    * @param source - Source filename in archive
    * @param destination - Destination path on disk
+   * @returns true if successful
    */
   extractFile(source: string, destination: string): boolean {
     return this.archive.extractFile(source, destination);
   }
 
   /**
-   * Add a file to the archive
+   * Add a file to the archive with default compression
    * @param sourcePath - Path to the file on disk
    * @param archiveName - Name for the file in the archive
    * @param options - Optional add file options
+   * @returns true if successful
    */
   addFile(sourcePath: string, archiveName: string, options?: AddFileOptions): boolean {
+    if (options?.compression !== undefined || options?.compressionNext !== undefined) {
+      return this.archive.addFileEx(
+        sourcePath,
+        archiveName,
+        options.flags || 0,
+        options.compression || 0,
+        options.compressionNext || 0
+      );
+    }
     return this.archive.addFile(sourcePath, archiveName, options?.flags);
+  }
+
+  /**
+   * Add a file to the archive with explicit compression settings
+   * @param sourcePath - Path to the file on disk
+   * @param archiveName - Name for the file in the archive
+   * @param flags - File flags (compression, encryption, etc.)
+   * @param compression - Compression method for first sector
+   * @param compressionNext - Compression method for subsequent sectors
+   * @returns true if successful
+   */
+  addFileEx(
+    sourcePath: string,
+    archiveName: string,
+    flags: number,
+    compression: number,
+    compressionNext: number
+  ): boolean {
+    return this.archive.addFileEx(sourcePath, archiveName, flags, compression, compressionNext);
   }
 
   /**
    * Remove a file from the archive
    * @param filename - Name of the file to remove
+   * @returns true if successful
    */
   removeFile(filename: string): boolean {
     return this.archive.removeFile(filename);
@@ -121,16 +193,10 @@ export class MpqArchive {
    * Rename a file in the archive
    * @param oldName - Current filename
    * @param newName - New filename
+   * @returns true if successful
    */
   renameFile(oldName: string, newName: string): boolean {
     return this.archive.renameFile(oldName, newName);
-  }
-
-  /**
-   * Compact the archive to remove unused space
-   */
-  compact(): boolean {
-    return this.archive.compact();
   }
 
   /**
@@ -139,6 +205,50 @@ export class MpqArchive {
    */
   getMaxFileCount(): number {
     return this.archive.getMaxFileCount();
+  }
+
+  /**
+   * Set the maximum number of files the archive can contain
+   * @param maxFileCount - New maximum file count
+   * @returns true if successful
+   */
+  setMaxFileCount(maxFileCount: number): boolean {
+    return this.archive.setMaxFileCount(maxFileCount);
+  }
+
+  /**
+   * Get the attributes flags for the archive
+   * @returns Attributes flags
+   */
+  getAttributes(): number {
+    return this.archive.getAttributes();
+  }
+
+  /**
+   * Set the attributes flags for the archive
+   * @param attributes - Attributes flags to set
+   * @returns true if successful
+   */
+  setAttributes(attributes: number): boolean {
+    return this.archive.setAttributes(attributes);
+  }
+
+  /**
+   * Verify a file in the archive
+   * @param filename - Name of the file to verify
+   * @param flags - Verification flags (SFILE_VERIFY_*)
+   * @returns Verification result flags
+   */
+  verifyFile(filename: string, flags: number): number {
+    return this.archive.verifyFile(filename, flags);
+  }
+
+  /**
+   * Verify the archive signature
+   * @returns Verification result code (ERROR_NO_SIGNATURE, ERROR_WEAK_SIGNATURE_OK, etc.)
+   */
+  verifyArchive(): number {
+    return this.archive.verifyArchive();
   }
 }
 
@@ -159,7 +269,7 @@ export class MpqFile {
    * @returns Buffer containing the read data
    */
   read(bytesToRead?: number): Buffer {
-    return this.file.read(bytesToRead || 4096);
+    return this.file.readFile(bytesToRead || 4096);
   }
 
   /**
@@ -167,7 +277,7 @@ export class MpqFile {
    * @returns Buffer containing all file data
    */
   readAll(): Buffer {
-    return this.file.readAll();
+    return this.file.readFileAll();
   }
 
   /**
@@ -175,7 +285,7 @@ export class MpqFile {
    * @returns File size in bytes
    */
   getSize(): number {
-    return this.file.getSize();
+    return this.file.getFileSize();
   }
 
   /**
@@ -183,7 +293,7 @@ export class MpqFile {
    * @returns Current position in bytes
    */
   getPosition(): number {
-    return this.file.getPosition();
+    return this.file.getFilePointer();
   }
 
   /**
@@ -192,7 +302,7 @@ export class MpqFile {
    * @returns The new position
    */
   setPosition(position: number): number {
-    return this.file.setPosition(position);
+    return this.file.setFilePointer(position);
   }
 
   /**
@@ -200,14 +310,18 @@ export class MpqFile {
    * @returns true if closed successfully
    */
   close(): boolean {
-    return this.file.close();
+    return this.file.closeFile();
   }
 }
 
+// Export low-level bindings for advanced usage
 export { Archive, File };
+
+// Default export
 export default {
   MpqArchive,
   MpqFile,
   Archive,
   File
 };
+
