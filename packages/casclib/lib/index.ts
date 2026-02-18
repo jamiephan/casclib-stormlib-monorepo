@@ -1,4 +1,14 @@
-import { Storage, File, FindData, StorageInfo, FileInfoResult, CascNameType, OpenStorageExOptions } from './bindings';
+import { 
+  CascStorageBinding, 
+  CascFileBinding, 
+  CascFindData, 
+  CascStorageInfo, 
+  CascFileInfoResult, 
+  CascNameType, 
+  CascOpenStorageExOptions,
+  CascStorage,
+  CascFile
+} from './bindings';
 
 /**
  * Options for opening a CASC storage
@@ -30,11 +40,11 @@ export interface FileOpenOptions {
  * CascLib Storage wrapper class
  * Provides methods to interact with CASC storage archives
  */
-export class CascStorage {
-  private storage: Storage;
+export class Storage {
+  private storage: CascStorage;
 
   constructor() {
-    this.storage = new Storage();
+    this.storage = new CascStorageBinding();
   }
 
   /**
@@ -43,7 +53,7 @@ export class CascStorage {
    * @param options - Optional opening options
    */
   open(path: string, options?: StorageOpenOptions): void {
-    this.storage.openStorage(path, options?.flags || 0);
+    this.storage.CascOpenStorage(path, options?.flags || 0);
   }
 
   /**
@@ -76,7 +86,7 @@ export class CascStorage {
    * ```
    */
   openOnline(path: string, options?: StorageOpenOptions): void {
-    this.storage.openStorageOnline(path, options?.flags || 0);
+    this.storage.CascOpenOnlineStorage(path, options?.flags || 0);
   }
 
   /**
@@ -84,26 +94,26 @@ export class CascStorage {
    * @param params - Path or parameter string
    * @param options - Extended opening options
    */
-  openEx(params: string, options?: OpenStorageExOptions): void {
-    this.storage.openStorageEx(params, options);
+  openEx(params: string, options?: CascOpenStorageExOptions): void {
+    this.storage.CascOpenStorageEx(params, options);
   }
 
   /**
    * Close the CASC storage
    */
   close(): boolean {
-    return this.storage.closeStorage();
+    return this.storage.CascCloseStorage();
   }
 
   /**
    * Open a file from the storage
    * @param filename - Name of the file to open
    * @param options - Optional opening options
-   * @returns A CascFile object
+   * @returns A File object
    */
-  openFile(filename: string, options?: FileOpenOptions): CascFile {
-    const file = this.storage.openFile(filename, options?.flags || 0);
-    return new CascFile(file);
+  openFile(filename: string, options?: FileOpenOptions): File {
+    const file = this.storage.CascOpenFile(filename, options?.flags || 0);
+    return new File(file);
   }
 
   /**
@@ -112,7 +122,7 @@ export class CascStorage {
    * @returns File information or null if file doesn't exist
    */
   getFileInfo(filename: string): FileInfo | null {
-    return this.storage.getFileInfo(filename);
+    return this.storage.CascGetFileInfo(filename);
   }
 
   /**
@@ -129,8 +139,8 @@ export class CascStorage {
    * @param infoClass - The type of information to retrieve
    * @returns Storage information object
    */
-  getStorageInfo(infoClass: number): StorageInfo {
-    return this.storage.getStorageInfo(infoClass);
+  getStorageInfo(infoClass: number): CascStorageInfo {
+    return this.storage.CascGetStorageInfo(infoClass);
   }
 
   /**
@@ -139,16 +149,16 @@ export class CascStorage {
    * @param listFile - Optional list file path
    * @returns Find data or null if no files found
    */
-  findFirstFile(mask?: string, listFile?: string): FindData | null {
-    return this.storage.findFirstFile(mask, listFile);
+  findFirstFile(mask?: string, listFile?: string): CascFindData | null {
+    return this.storage.CascFindFirstFile(mask, listFile);
   }
 
   /**
    * Find the next file in the search
    * @returns Find data or null if no more files
    */
-  findNextFile(): FindData | null {
-    return this.storage.findNextFile();
+  findNextFile(): CascFindData | null {
+    return this.storage.CascFindNextFile();
   }
 
   /**
@@ -156,7 +166,7 @@ export class CascStorage {
    * @returns true if closed successfully
    */
   findClose(): boolean {
-    return this.storage.findClose();
+    return this.storage.CascFindClose();
   }
 
   /**
@@ -166,7 +176,7 @@ export class CascStorage {
    * @returns true if added successfully
    */
   addEncryptionKey(keyName: number, key: Buffer): boolean {
-    return this.storage.addEncryptionKey(keyName, key);
+    return this.storage.CascAddEncryptionKey(keyName, key);
   }
 
   /**
@@ -176,7 +186,7 @@ export class CascStorage {
    * @returns true if added successfully
    */
   addStringEncryptionKey(keyName: number, keyStr: string): boolean {
-    return this.storage.addStringEncryptionKey(keyName, keyStr);
+    return this.storage.CascAddStringEncryptionKey(keyName, keyStr);
   }
 
   /**
@@ -185,7 +195,7 @@ export class CascStorage {
    * @returns true if imported successfully
    */
   importKeysFromString(keyList: string): boolean {
-    return this.storage.importKeysFromString(keyList);
+    return this.storage.CascImportKeysFromString(keyList);
   }
 
   /**
@@ -194,7 +204,7 @@ export class CascStorage {
    * @returns true if imported successfully
    */
   importKeysFromFile(filePath: string): boolean {
-    return this.storage.importKeysFromFile(filePath);
+    return this.storage.CascImportKeysFromFile(filePath);
   }
 
   /**
@@ -203,7 +213,7 @@ export class CascStorage {
    * @returns Key data or null if not found
    */
   findEncryptionKey(keyName: number): Buffer | null {
-    return this.storage.findEncryptionKey(keyName);
+    return this.storage.CascFindEncryptionKey(keyName);
   }
 
   /**
@@ -211,7 +221,7 @@ export class CascStorage {
    * @returns Key name or null
    */
   getNotFoundEncryptionKey(): number | null {
-    return this.storage.getNotFoundEncryptionKey();
+    return this.storage.CascGetNotFoundEncryptionKey();
   }
 }
 
@@ -219,10 +229,10 @@ export class CascStorage {
  * CascLib File wrapper class
  * Represents an open file in CASC storage
  */
-export class CascFile {
-  private file: File;
+export class File {
+  private file: CascFile;
 
-  constructor(file: File) {
+  constructor(file: CascFile) {
     this.file = file;
   }
 
@@ -232,7 +242,7 @@ export class CascFile {
    * @returns Buffer containing the read data
    */
   read(bytesToRead?: number): Buffer {
-    return this.file.readFile(bytesToRead || 4096);
+    return this.file.CascReadFile(bytesToRead || 4096);
   }
 
   /**
@@ -248,7 +258,7 @@ export class CascFile {
    * @returns File size in bytes
    */
   getSize(): number {
-    return this.file.getFileSize();
+    return this.file.CascGetFileSize();
   }
 
   /**
@@ -256,7 +266,7 @@ export class CascFile {
    * @returns File size in bytes
    */
   getSize64(): number {
-    return this.file.getFileSize64();
+    return this.file.CascGetFileSize64();
   }
 
   /**
@@ -264,7 +274,7 @@ export class CascFile {
    * @returns Current position in bytes
    */
   getPosition(): number {
-    return this.file.getFilePointer();
+    return this.file.CascGetFilePointer();
   }
 
   /**
@@ -272,7 +282,7 @@ export class CascFile {
    * @returns Current position in bytes
    */
   getPosition64(): number {
-    return this.file.getFilePointer64();
+    return this.file.CascGetFilePointer64();
   }
 
   /**
@@ -281,7 +291,7 @@ export class CascFile {
    * @returns The new position
    */
   setPosition(position: number): number {
-    return this.file.setFilePointer(position);
+    return this.file.CascSetFilePointer(position);
   }
 
   /**
@@ -291,7 +301,7 @@ export class CascFile {
    * @returns The new position
    */
   setPosition64(position: number, moveMethod?: number): number {
-    return this.file.setFilePointer64(position, moveMethod);
+    return this.file.CascSetFilePointer64(position, moveMethod);
   }
 
   /**
@@ -299,8 +309,8 @@ export class CascFile {
    * @param infoClass - The type of information to retrieve
    * @returns File information object
    */
-  getFileInfo(infoClass: number): FileInfoResult {
-    return this.file.getFileInfo(infoClass);
+  getFileInfo(infoClass: number): CascFileInfoResult {
+    return this.file.CascGetFileInfo(infoClass);
   }
 
   /**
@@ -309,7 +319,7 @@ export class CascFile {
    * @returns true if set successfully
    */
   setFileFlags(flags: number): boolean {
-    return this.file.setFileFlags(flags);
+    return this.file.CascSetFileFlags(flags);
   }
 
   /**
@@ -317,16 +327,16 @@ export class CascFile {
    * @returns true if closed successfully
    */
   close(): boolean {
-    return this.file.closeFile();
+    return this.file.CascCloseFile();
   }
 }
 
 // Re-export everything from bindings
 export * from './bindings';
 
-export { Storage, File, CascNameType };
+// High-level exports
 export default {
-  CascStorage,
-  CascFile
+  Storage,
+  File
 };
 

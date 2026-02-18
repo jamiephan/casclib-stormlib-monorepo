@@ -8,23 +8,23 @@ Napi::Object CascStorage::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Storage", {
-    InstanceMethod("openStorage", &CascStorage::Open),
-    InstanceMethod("openStorageOnline", &CascStorage::OpenOnline),
-    InstanceMethod("openStorageEx", &CascStorage::OpenEx),
-    InstanceMethod("closeStorage", &CascStorage::Close),
-    InstanceMethod("openFile", &CascStorage::OpenFile),
-    InstanceMethod("getFileInfo", &CascStorage::GetFileInfo),
+    InstanceMethod("CascOpenStorage", &CascStorage::Open),
+    InstanceMethod("CascOpenOnlineStorage", &CascStorage::OpenOnline),
+    InstanceMethod("CascOpenStorageEx", &CascStorage::OpenEx),
+    InstanceMethod("CascCloseStorage", &CascStorage::Close),
+    InstanceMethod("CascOpenFile", &CascStorage::OpenFile),
+    InstanceMethod("CascGetFileInfo", &CascStorage::GetFileInfo),
     InstanceMethod("fileExists", &CascStorage::FileExists),
-    InstanceMethod("getStorageInfo", &CascStorage::GetStorageInfo),
-    InstanceMethod("findFirstFile", &CascStorage::FindFirstFile),
-    InstanceMethod("findNextFile", &CascStorage::FindNextFile),
-    InstanceMethod("findClose", &CascStorage::FindClose),
-    InstanceMethod("addEncryptionKey", &CascStorage::AddEncryptionKey),
-    InstanceMethod("addStringEncryptionKey", &CascStorage::AddStringEncryptionKey),
-    InstanceMethod("importKeysFromString", &CascStorage::ImportKeysFromString),
-    InstanceMethod("importKeysFromFile", &CascStorage::ImportKeysFromFile),
-    InstanceMethod("findEncryptionKey", &CascStorage::FindEncryptionKey),
-    InstanceMethod("getNotFoundEncryptionKey", &CascStorage::GetNotFoundEncryptionKey)
+    InstanceMethod("CascGetStorageInfo", &CascStorage::GetStorageInfo),
+    InstanceMethod("CascFindFirstFile", &CascStorage::FindFirstFile),
+    InstanceMethod("CascFindNextFile", &CascStorage::FindNextFile),
+    InstanceMethod("CascFindClose", &CascStorage::FindClose),
+    InstanceMethod("CascAddEncryptionKey", &CascStorage::AddEncryptionKey),
+    InstanceMethod("CascAddStringEncryptionKey", &CascStorage::AddStringEncryptionKey),
+    InstanceMethod("CascImportKeysFromString", &CascStorage::ImportKeysFromString),
+    InstanceMethod("CascImportKeysFromFile", &CascStorage::ImportKeysFromFile),
+    InstanceMethod("CascFindEncryptionKey", &CascStorage::FindEncryptionKey),
+    InstanceMethod("CascGetNotFoundEncryptionKey", &CascStorage::GetNotFoundEncryptionKey)
   });
 
   constructor = Napi::Persistent(func);

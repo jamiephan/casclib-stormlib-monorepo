@@ -116,13 +116,13 @@ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
   CascFile::Init(env, exports);
 
   // Export utility functions
-  exports.Set("openLocalFile", Napi::Function::New(env, OpenLocalFile));
-  exports.Set("getError", Napi::Function::New(env, GetError));
-  exports.Set("setError", Napi::Function::New(env, SetError));
+  exports.Set("CascOpenLocalFile", Napi::Function::New(env, OpenLocalFile));
+  exports.Set("GetCascError", Napi::Function::New(env, GetError));
+  exports.Set("SetCascError", Napi::Function::New(env, SetError));
   
   // Export CDN functions
-  exports.Set("cdnGetDefault", Napi::Function::New(env, CdnGetDefault));
-  exports.Set("cdnDownload", Napi::Function::New(env, CdnDownload));
+  exports.Set("CascCdnGetDefault", Napi::Function::New(env, CdnGetDefault));
+  exports.Set("CascCdnDownload", Napi::Function::New(env, CdnDownload));
 
   // Export version constants
   exports.Set("CASCLIB_VERSION", Napi::Number::New(env, CASCLIB_VERSION));

@@ -12,7 +12,7 @@ A monorepo containing Node.js native bindings for **CascLib** and **StormLib** -
 
 MIT
 
-## 🙏 Credits
+## Credits
 
 - [CascLib](https://github.com/ladislav-zezula/CascLib) by Ladislav Zezula
 - [StormLib](https://github.com/ladislav-zezula/StormLib) by Ladislav Zezula

@@ -5,7 +5,7 @@ describe('Dummy Test', () => {
 });
 
 
-// import { CascStorage, CascFile } from "../lib";
+// import { Storage, File } from "../lib";
 // import * as path from "path";
 // import * as fs from "fs";
 // import * as os from "os";
@@ -14,12 +14,12 @@ describe('Dummy Test', () => {
 
 // describe("CascLib", () => {
 //   describe("CascStorageOnlineStorage", () => {
-//     let storage: CascStorage;
+//     let storage: Storage;
 
 //     const TEST_ONLINE_STORAGE = `${TEMP_DIR}*hero*us`;
 
 //     beforeEach(() => {
-//       storage = new CascStorage();
+//       storage = new Storage();
 //     });
 
 //     afterEach(() => {
@@ -221,10 +221,10 @@ describe('Dummy Test', () => {
 //   });
 
 //   describe("CascStorage", () => {
-//     let storage: CascStorage;
+//     let storage: Storage;
 
 //     beforeEach(() => {
-//       storage = new CascStorage();
+//       storage = new Storage();
 //     });
 
 //     afterEach(() => {
@@ -234,7 +234,7 @@ describe('Dummy Test', () => {
 //     });
 
 //     it("should create a storage instance", () => {
-//       expect(storage).toBeInstanceOf(CascStorage);
+//       expect(storage).toBeInstanceOf(Storage);
 //     });
 
 //     it("should throw error when opening non-existent storage", () => {
@@ -245,14 +245,14 @@ describe('Dummy Test', () => {
 //   });
 
 //   describe("Module exports", () => {
-//     it("should export CascStorage", () => {
-//       expect(CascStorage).toBeDefined();
-//       expect(typeof CascStorage).toBe("function");
+//     it("should export Storage", () => {
+//       expect(Storage).toBeDefined();
+//       expect(typeof Storage).toBe("function");
 //     });
 
-//     it("should export CascFile", () => {
-//       expect(CascFile).toBeDefined();
-//       expect(typeof CascFile).toBe("function");
+//     it("should export File", () => {
+//       expect(File).toBeDefined();
+//       expect(typeof File).toBe("function");
 //     });
 //   });
 // });

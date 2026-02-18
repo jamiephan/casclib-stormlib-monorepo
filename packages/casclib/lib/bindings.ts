@@ -3,7 +3,7 @@ import * as path from 'path';
 const bindings = require('node-gyp-build')(path.join(__dirname, '..'));
 
 // Storage info classes
-export enum StorageInfoClass {
+export enum CascStorageInfoClass {
   LocalFileCount = 0,
   TotalFileCount = 1,
   Features = 2,
@@ -14,7 +14,7 @@ export enum StorageInfoClass {
 }
 
 // File info classes
-export enum FileInfoClass {
+export enum CascFileInfoClass {
   ContentKey = 0,
   EncodedKey = 1,
   FullInfo = 2,
@@ -30,7 +30,7 @@ export enum CascNameType {
 }
 
 // Find data structure
-export interface FindData {
+export interface CascFindData {
   fileName: string;
   ckey: Buffer;
   ekey: Buffer;
@@ -46,13 +46,13 @@ export interface FindData {
 }
 
 // Storage product info
-export interface StorageProduct {
+export interface CascStorageProduct {
   codeName: string;
   buildNumber: number;
 }
 
 // Storage info result
-export interface StorageInfo {
+export interface CascStorageInfo {
   fileCount?: number;
   features?: number;
   codeName?: string;
@@ -60,7 +60,7 @@ export interface StorageInfo {
 }
 
 // File full info
-export interface FileFullInfo {
+export interface CascFileFullInfo {
   ckey: Buffer;
   ekey: Buffer;
   dataFileName: string;
@@ -78,7 +78,7 @@ export interface FileFullInfo {
 }
 
 // File span info
-export interface FileSpanInfo {
+export interface CascFileSpanInfo {
   ckey: Buffer;
   ekey: Buffer;
   startOffset: number;
@@ -90,7 +90,7 @@ export interface FileSpanInfo {
 }
 
 // File info result
-export interface FileInfoResult {
+export interface CascFileInfoResult {
   ckey?: Buffer;
   ekey?: Buffer;
   dataFileName?: string;
@@ -107,7 +107,7 @@ export interface FileInfoResult {
   contentFlags?: number;
 }
 
-export interface OpenStorageExOptions {
+export interface CascOpenStorageExOptions {
   localPath?: string;
   codeName?: string;
   region?: string;
@@ -118,69 +118,69 @@ export interface OpenStorageExOptions {
   online?: boolean;
 }
 
-export interface Storage {
+export interface CascStorage {
   // Basic operations
-  openStorage(path: string, flags: number): boolean;
-  openStorageOnline(path: string, flags: number): boolean;
-  openStorageEx(params: string, options?: OpenStorageExOptions): boolean;
-  closeStorage(): boolean;
+  CascOpenStorage(path: string, flags: number): boolean;
+  CascOpenOnlineStorage(path: string, flags: number): boolean;
+  CascOpenStorageEx(params: string, options?: CascOpenStorageExOptions): boolean;
+  CascCloseStorage(): boolean;
   
   // File operations
-  openFile(filename: string, flags: number): File;
-  getFileInfo(filename: string): { name: string; size: number } | null;
-  fileExists(filename: string): boolean;
+  CascOpenFile(filename: string, flags: number): CascFile;
+  CascGetFileInfo(filename: string): { name: string; size: number } | null;
+  fileExists(filename: string): boolean;  // Helper function, not in CascLib.h
   
   // Storage info
-  getStorageInfo(infoClass: number): StorageInfo;
+  CascGetStorageInfo(infoClass: number): CascStorageInfo;
   
   // Find operations
-  findFirstFile(mask?: string, listFile?: string): FindData | null;
-  findNextFile(): FindData | null;
-  findClose(): boolean;
+  CascFindFirstFile(mask?: string, listFile?: string): CascFindData | null;
+  CascFindNextFile(): CascFindData | null;
+  CascFindClose(): boolean;
   
   // Encryption key operations
-  addEncryptionKey(keyName: number, key: Buffer): boolean;
-  addStringEncryptionKey(keyName: number, keyStr: string): boolean;
-  importKeysFromString(keyList: string): boolean;
-  importKeysFromFile(filePath: string): boolean;
-  findEncryptionKey(keyName: number): Buffer | null;
-  getNotFoundEncryptionKey(): number | null;
+  CascAddEncryptionKey(keyName: number, key: Buffer): boolean;
+  CascAddStringEncryptionKey(keyName: number, keyStr: string): boolean;
+  CascImportKeysFromString(keyList: string): boolean;
+  CascImportKeysFromFile(filePath: string): boolean;
+  CascFindEncryptionKey(keyName: number): Buffer | null;
+  CascGetNotFoundEncryptionKey(): number | null;
 }
 
-export interface File {
+export interface CascFile {
   // Basic read operations
-  readFile(bytesToRead: number): Buffer;
-  readFileAll(): Buffer;
+  CascReadFile(bytesToRead: number): Buffer;
+  readFileAll(): Buffer;  // Helper function, not in CascLib.h
   
   // Size operations
-  getFileSize(): number;
-  getFileSize64(): number;
+  CascGetFileSize(): number;
+  CascGetFileSize64(): number;
   
   // Position operations
-  getFilePointer(): number;
-  getFilePointer64(): number;
-  setFilePointer(position: number): number;
-  setFilePointer64(position: number, moveMethod?: number): number;
+  CascGetFilePointer(): number;  // Helper function, uses CascSetFilePointer
+  CascGetFilePointer64(): number;  // Helper function, uses CascSetFilePointer64
+  CascSetFilePointer(position: number): number;
+  CascSetFilePointer64(position: number, moveMethod?: number): number;
   
   // File info and flags
-  getFileInfo(infoClass: number): FileInfoResult;
-  setFileFlags(flags: number): boolean;
+  CascGetFileInfo(infoClass: number): CascFileInfoResult;
+  CascSetFileFlags(flags: number): boolean;
   
   // Close
-  closeFile(): boolean;
+  CascCloseFile(): boolean;
 }
 
-export const Storage: new () => Storage = bindings.Storage;
-export const File: new () => File = bindings.File;
+export const CascStorageBinding: new () => CascStorage = bindings.Storage;
+export const CascFileBinding: new () => CascFile = bindings.File;
 
 // Utility functions
-export const openLocalFile: (filename: string, flags?: number) => File = bindings.openLocalFile;
-export const getError: () => number = bindings.getError;
-export const setError: (error: number) => void = bindings.setError;
+export const CascOpenLocalFile: (filename: string, flags?: number) => CascFile = bindings.CascOpenLocalFile;
+export const GetCascError: () => number = bindings.GetCascError;
+export const SetCascError: (error: number) => void = bindings.SetCascError;
 
 // CDN functions
-export const cdnGetDefault: () => string | null = bindings.cdnGetDefault;
-export const cdnDownload: (cdnHostUrl: string, product: string, fileName: string) => Buffer | null = bindings.cdnDownload;
+export const CascCdnGetDefault: () => string | null = bindings.CascCdnGetDefault;
+export const CascCdnDownload: (cdnHostUrl: string, product: string, fileName: string) => Buffer | null = bindings.CascCdnDownload;
 
 // Version constants
 export const CASCLIB_VERSION: number = bindings.CASCLIB_VERSION || 0x0300;

@@ -629,29 +629,30 @@ interface FileInfoResult {
 For advanced users who need direct access to the native bindings:
 
 ```typescript
-import { Storage, File } from '@jamiephan/casclib';
+import { Storage, File, CascStorage, CascFile } from '@jamiephan/casclib';
 import * as constants from '@jamiephan/casclib';
 
-const storage = new Storage();
-storage.openStorage('/path/to/storage', 0);
+const storage: CascStorage = new Storage();
+storage.CascOpenStorage('/path/to/storage', 0);
 
-const file = storage.openFile('filename.txt', constants.CASC_OPEN_BY_NAME);
-const size = file.getFileSize64();
+const file: CascFile = storage.CascOpenFile('filename.txt', constants.CASC_OPEN_BY_NAME);
+const size = file.CascGetFileSize64();
 const content = file.readFileAll();
-file.closeFile();
+file.CascCloseFile();
 
-storage.closeStorage();
+storage.CascCloseStorage();
 ```
 
 ### Binding Naming Convention
 
-The low-level bindings follow this pattern:
-- C++ function: `CascOpenStorageEx` → JS binding: `openStorageEx`
-- C++ function: `CascGetFileSize64` → JS binding: `getFileSize64`
+The low-level bindings use **exact names from CascLib.h**:
+- C++ function: `CascOpenStorageEx` → JS binding: `CascOpenStorageEx`
+- C++ function: `CascGetFileSize64` → JS binding: `CascGetFileSize64`
+- Interfaces are prefixed with `CASC`: `CascStorage`, `CascFile`, `CascFindData`, etc.
 
-The high-level wrapper simplifies these names further:
-- Binding: `openStorageEx` → Wrapper: `openEx()`
-- Binding: `getFileSize64` → Wrapper: `getSize64()`
+The high-level wrapper simplifies these names:
+- Binding: `CascOpenStorageEx` → Wrapper: `openEx()`
+- Binding: `CascGetFileSize64` → Wrapper: `getSize64()`
 
 See [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md) for complete details.
 
