@@ -1,8 +1,7 @@
 import { 
-  Archive, 
-  File,
-  MPQArchive as MPQArchiveBinding,
-  MPQFile as MPQFileBinding
+  MPQArchiveBinding, 
+  MPQArchive,
+  MPQFile
 } from './bindings';
 
 // Re-export all constants
@@ -50,11 +49,11 @@ export interface AddFileOptions {
  * StormLib Archive wrapper class
  * Provides methods to interact with MPQ archive files
  */
-export class MpqArchive {
-  private archive: MPQArchiveBinding;
+export class Archive {
+  private archive: MPQArchive;
 
   constructor() {
-    this.archive = new Archive();
+    this.archive = new MPQArchiveBinding();
   }
 
   /**
@@ -62,7 +61,7 @@ export class MpqArchive {
    * This is a static method that affects all archive operations
    */
   static getLocale(): number {
-    return Archive.SFileGetLocale();
+    return MPQArchiveBinding.SFileGetLocale();
   }
 
   /**
@@ -72,7 +71,7 @@ export class MpqArchive {
    * @returns The previous locale ID
    */
   static setLocale(locale: number): number {
-    return Archive.SFileSetLocale(locale);
+    return MPQArchiveBinding.SFileSetLocale(locale);
   }
 
   /**
@@ -120,11 +119,11 @@ export class MpqArchive {
    * Open a file from the archive
    * @param filename - Name of the file to open
    * @param options - Optional opening options
-   * @returns An MpqFile object
+   * @returns An File object
    */
-  openFile(filename: string, options?: FileOpenOptions): MpqFile {
+  openFile(filename: string, options?: FileOpenOptions): File {
     const file = this.archive.SFileOpenFileEx(filename, options?.flags || 0);
-    return new MpqFile(file);
+    return new File(file);
   }
 
   /**
@@ -261,10 +260,10 @@ export class MpqArchive {
  * StormLib File wrapper class
  * Represents an open file in an MPQ archive
  */
-export class MpqFile {
-  private file: MPQFileBinding;
+export class File {
+  private file: MPQFile;
 
-  constructor(file: MPQFileBinding) {
+  constructor(file: MPQFile) {
     this.file = file;
   }
 
@@ -320,12 +319,10 @@ export class MpqFile {
 }
 
 // Export low-level bindings for advanced usage
-export { Archive, File, MPQArchive, MPQFile } from './bindings';
+export * from './bindings';
 
 // Default export
 export default {
-  MpqArchive,
-  MpqFile,
   Archive,
   File
 };

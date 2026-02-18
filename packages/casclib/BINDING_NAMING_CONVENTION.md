@@ -77,15 +77,15 @@ storage.CascCloseStorage();
 
 ### Wrapper Class Usage (High-level API - Recommended)
 
-The high-level wrapper classes (`CascStorage` and `CascFile`) provide a cleaner API with simplified method names:
+The high-level wrapper classes (`Storage` and `File`) provide a cleaner API with simplified method names:
 
 ```typescript
 import { Storage } from '@jamiephan/casclib';
 
-const storage = new CascStorage();
+const storage = new Storage();
 storage.open('/path/to/storage'); // Calls storage.CascOpenStorage internally
 
-const file = storage.openFile('file.txt');
+const file = storage.openFile('file.txt'); // Calls storage.CascOpenFile internally
 const size = file.getSize64(); // Calls file.CascGetFileSize64 internally
 const content = file.readAll(); // Calls file.readFileAll internally
 file.close(); // Calls file.CascCloseFile internally

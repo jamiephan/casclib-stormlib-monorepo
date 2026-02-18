@@ -51,10 +51,10 @@ This ensures direct correspondence between the C++ API and JavaScript bindings f
 ### Direct Binding Usage (Low-level API)
 
 ```typescript
-import { Archive, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
+import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
 
 // Use type aliases to avoid confusion with wrapper classes
-const archive: MPQArchive = new Archive();
+const archive: MPQArchive = new MPQArchiveBinding();
 archive.SFileOpenArchive('/path/to/archive.mpq', 0);
 
 const file: MPQFile = archive.SFileOpenFileEx('file.txt', 0);
@@ -67,12 +67,12 @@ archive.SFileCloseArchive();
 
 ### Wrapper Class Usage (High-level API - Recommended)
 
-The high-level wrapper classes (`MpqArchive` and `MpqFile`) provide a cleaner API with simplified method names:
+The high-level wrapper classes (`Archive` and `File`) provide a cleaner API with simplified method names:
 
 ```typescript
-import { MpqArchive } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 
-const archive = new MpqArchive();
+const archive = new Archive();
 archive.open('/path/to/archive.mpq'); // Calls archive.SFileOpenArchive internally
 
 const file = archive.openFile('file.txt'); // Calls archive.SFileOpenFileEx internally
@@ -87,6 +87,6 @@ archive.close(); // Calls archive.SFileCloseArchive internally
 
 - The low-level bindings (in `lib/bindings.ts`) use exact StormLib.h function names
 - Interfaces are prefixed with `MPQ` (e.g., `MPQArchive`, `MPQFile`) to indicate MPQ archive types
-- The high-level wrapper classes (`MpqArchive` and `MpqFile` in `lib/index.ts`) provide simplified method names for better developer experience
+- The high-level wrapper classes (`Archive` and `File` in `lib/index.ts`) provide simplified method names for better developer experience
 - Tests and documentation use the high-level API, so they don't need changes when updating binding names
 - Constants and flags are exported with their original names (e.g., `MPQ_FILE_COMPRESS`, `MPQ_FILE_ENCRYPTED`)

@@ -39,10 +39,10 @@ pnpm add @jamiephan/stormlib
 
 This package provides two layers of API:
 
-1. **High-level Wrapper API** (Recommended) - `MpqArchive` and `MpqFile` classes with simplified method names
-2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with exact StormLib.h naming
+1. **High-level Wrapper API** (Recommended) - `Archive` and `File` classes with simplified method names
+2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with exact StormLib.h naming (interfaces: `MPQArchive`, `MPQFile`)
 
-Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings use exact names from `StormLib.h`, so C++ functions like `SFileOpenArchive` map directly to `SFileOpenArchive` in the bindings.
+Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings use exact function names from StormLib.h (e.g., `SFileOpenArchive`, `SFileReadFile`).
 
 For more details, see [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md).
 
@@ -54,21 +54,21 @@ The package supports both CommonJS and ES Module imports:
 
 ```javascript
 // ES Module (recommended)
-import { MpqArchive, MpqFile } from '@jamiephan/stormlib';
+import { Archive, File } from '@jamiephan/stormlib';
 
 // CommonJS
-const { MpqArchive, MpqFile } = require('@jamiephan/stormlib');
+const { Archive, File } = require('@jamiephan/stormlib');
 
 // Advanced: Direct binding access
-import { Archive, MPQArchive, MPQFile } from '@jamiephan/stormlib';
+import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
 ```
 
 ### Opening an MPQ Archive
 
 ```typescript
-import { MpqArchive } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 
-const archive = new MpqArchive();
+const archive = new Archive();
 archive.open('/path/to/archive.mpq');
 
 // Check if a file exists
@@ -104,10 +104,10 @@ file.close();
 ### Creating and Modifying Archives
 
 ```typescript
-import { MpqArchive } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 
 // Create a new archive
-const archive = new MpqArchive();
+const archive = new Archive();
 archive.create('/path/to/new-archive.mpq', {
   maxFileCount: 1000,
   flags: 0
@@ -132,7 +132,7 @@ archive.close();
 ### Extracting Files
 
 ```typescript
-const archive = new MpqArchive();
+const archive = new Archive();
 archive.open('/path/to/game.mpq');
 
 // Extract a file to disk
@@ -147,11 +147,11 @@ archive.close();
 ### Complete Example
 
 ```typescript
-import { MpqArchive } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 import * as fs from 'fs';
 
 async function processArchive() {
-  const archive = new MpqArchive();
+  const archive = new Archive();
   
   try {
     archive.open('/path/to/warcraft3.mpq');
@@ -185,15 +185,15 @@ processArchive();
 
 ## API Reference
 
-### MpqArchive
+### Archive
 
 #### Constructor
 
 ##### `constructor()`
-Creates a new MpqArchive instance.
+Creates a new Archive instance.
 
 ```typescript
-const archive = new MpqArchive();
+const archive = new Archive();
 ```
 
 #### Archive Operations
@@ -340,17 +340,17 @@ console.log(`Verification result: ${result}`);
 
 ##### Static Methods
 
-###### `MpqArchive.getLocale(): number`
+###### `Archive.getLocale(): number`
 Gets the current locale setting for archive operations.
 
 **Returns:** Current locale ID
 
 **Example:**
 ```typescript
-const locale = MpqArchive.getLocale();
+const locale = Archive.getLocale();
 ```
 
-###### `MpqArchive.setLocale(locale: number): number`
+###### `Archive.setLocale(locale: number): number`
 Sets the locale for archive operations.
 
 **Parameters:**
@@ -361,12 +361,12 @@ Sets the locale for archive operations.
 **Example:**
 ```typescript
 import { LANG_NEUTRAL } from '@jamiephan/stormlib';
-const oldLocale = MpqArchive.setLocale(LANG_NEUTRAL);
+const oldLocale = Archive.setLocale(LANG_NEUTRAL);
 ```
 
 #### File Operations
 
-##### `openFile(filename: string, options?: FileOpenOptions): MpqFile`
+##### `openFile(filename: string, options?: FileOpenOptions): File`
 Opens a file from the archive.
 
 **Parameters:**
@@ -374,7 +374,7 @@ Opens a file from the archive.
 - `options`: Optional opening options
   - `flags`: Open flags (number)
 
-**Returns:** An `MpqFile` object
+**Returns:** An `File` object
 
 **Example:**
 ```typescript
@@ -501,11 +501,11 @@ archive.renameFile('old-name.txt', 'new-name.txt');
 
 ---
 
-### MpqFile
+### File
 
 #### Constructor
 
-The `MpqFile` class is instantiated by calling `archive.openFile()`. Do not construct it directly.
+The `File` class is instantiated by calling `archive.openFile()`. Do not construct it directly.
 
 #### File Reading
 
@@ -805,12 +805,12 @@ archive.create('/path/to/archive.mpq', {
 
 ### Direct Binding Access
 
-For advanced users who need direct access to the native bindings with exact StormLib.h naming:
+For advanced users who need direct access to the native bindings:
 
 ```typescript
-import { Archive, MPQArchive, MPQFile } from '@jamiephan/stormlib';
+import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
 
-const archive: MPQArchive = new Archive();
+const archive: MPQArchive = new MPQArchiveBinding();
 archive.SFileOpenArchive('/path/to/archive.mpq', 0);
 
 const file: MPQFile = archive.SFileOpenFileEx('filename.txt', 0);
@@ -818,19 +818,19 @@ const size = file.SFileGetFileSize();
 const content = file.SFileReadFile(size);
 file.SFileCloseFile();
 
-archive.compactArchive();
-archive.closeArchive();
+archive.SFileCloseArchive();
 ```
 
 ### Binding Naming Convention
 
-The low-level bindings follow this pattern:
-- C++ function: `SFileOpenArchive` → JS binding: `openArchive`
-- C++ function: `SFileGetFileSize` → JS binding: `getFileSize`
+The low-level bindings use **exact names from StormLib.h**:
+- C++ function: `SFileOpenArchive` → JS binding: `SFileOpenArchive`
+- C++ function: `SFileGetFileSize` → JS binding: `SFileGetFileSize`
+- Interfaces are prefixed with `MPQ`: `MPQArchive`, `MPQFile`, etc.
 
-The high-level wrapper simplifies these names further:
-- Binding: `openArchive` → Wrapper: `open()`
-- Binding: `getFileSize` → Wrapper: `getSize()`
+The high-level wrapper simplifies these names:
+- Binding: `SFileOpenArchive` → Wrapper: `open()`
+- Binding: `SFileGetFileSize` → Wrapper: `getSize()`
 
 See [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md) for complete details.
 
@@ -848,7 +848,7 @@ All methods that can fail will throw exceptions. Always use try-catch blocks:
 
 ```typescript
 try {
-  const archive = new MpqArchive();
+  const archive = new Archive();
   archive.open('/path/to/archive.mpq');
   
   if (archive.hasFile('some-file.txt')) {

@@ -38,10 +38,10 @@ pnpm add @jamiephan/casclib
 
 This package provides two layers of API:
 
-1. **High-level Wrapper API** (Recommended) - `CascStorage` and `CascFile` classes with simplified method names
-2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with explicit naming
+1. **High-level Wrapper API** (Recommended) - `Storage` and `File` classes with simplified method names
+2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with CascLib.h names (interfaces: `CascStorage`, `CascFile`)
 
-Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings follow a strict naming convention where C++ functions like `CascOpenStorageEx` map to `openStorageEx` in the bindings.
+Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings use exact function names from CascLib.h (e.g., `CascOpenStorage`, `CascOpenFile`).
 
 For more details, see [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md).
 
@@ -53,21 +53,21 @@ The package supports both CommonJS and ES Module imports:
 
 ```javascript
 // ES Module (recommended)
-import { CascStorage, CascFile } from '@jamiephan/casclib';
+import { Storage, File } from '@jamiephan/casclib';
 
 // CommonJS
-const { CascStorage, CascFile } = require('@jamiephan/casclib');
+const { Storage, File } = require('@jamiephan/casclib');
 
 // Advanced: Direct binding access
-import { Storage, File } from '@jamiephan/casclib';
+import { CascStorageBinding, CascStorage, CascFile } from '@jamiephan/casclib/bindings';
 ```
 
 ### Opening a CASC Storage
 
 ```typescript
-import { CascStorage } from '@jamiephan/casclib';
+import { Storage } from '@jamiephan/casclib';
 
-const storage = new CascStorage();
+const storage = new Storage();
 storage.open('/path/to/heroes/HeroesData');
 
 // Check if a file exists
@@ -108,7 +108,7 @@ file.close();
 ```typescript
 // Connect to online CASC storage
 // Format: local_cache_folder[*cdn_server_url]*code_name[*region]
-const storage = new CascStorage();
+const storage = new Storage();
 
 // Windows - Basic usage with cache folder and product code
 storage.openOnline('C:/Temp/CASC/Cache*hero');
@@ -175,10 +175,10 @@ if (keyData) {
 ### Complete Example
 
 ```typescript
-import { CascStorage } from '@jamiephan/casclib';
+import { Storage } from '@jamiephan/casclib';
 
 async function readGameFile() {
-  const storage = new CascStorage();
+  const storage = new Storage();
   
   try {
     storage.open('/path/to/heroes/HeroesData');
@@ -204,15 +204,15 @@ readGameFile();
 
 ## API Reference
 
-### CascStorage
+### Storage
 
 #### Constructor
 
 ##### `constructor()`
-Creates a new CascStorage instance.
+Creates a new Storage instance.
 
 ```typescript
-const storage = new CascStorage();
+const storage = new Storage();
 ```
 
 #### Storage Operations
@@ -285,7 +285,7 @@ Gets storage information.
 
 #### File Operations
 
-##### `openFile(filename: string, options?: FileOpenOptions): CascFile`
+##### `openFile(filename: string, options?: FileOpenOptions): File`
 Opens a file from the storage.
 
 **Parameters:**
@@ -293,7 +293,7 @@ Opens a file from the storage.
 - `options`: Optional opening options
   - `flags`: Open flags (number)
 
-**Returns:** A `CascFile` object
+**Returns:** A `File` object
 
 **Example:**
 ```typescript
@@ -457,11 +457,11 @@ Gets the name of an encryption key that was not found.
 
 ---
 
-### CascFile
+### File
 
 #### Constructor
 
-The `CascFile` class is instantiated by calling `storage.openFile()`. Do not construct it directly.
+The `File` class is instantiated by calling `storage.openFile()`. Do not construct it directly.
 
 #### File Reading
 
@@ -629,10 +629,10 @@ interface FileInfoResult {
 For advanced users who need direct access to the native bindings:
 
 ```typescript
-import { Storage, File, CascStorage, CascFile } from '@jamiephan/casclib';
+import { CascStorageBinding, CascStorage, CascFile } from '@jamiephan/casclib/bindings';
 import * as constants from '@jamiephan/casclib';
 
-const storage: CascStorage = new Storage();
+const storage: CascStorage = new CascStorageBinding();
 storage.CascOpenStorage('/path/to/storage', 0);
 
 const file: CascFile = storage.CascOpenFile('filename.txt', constants.CASC_OPEN_BY_NAME);
@@ -669,7 +669,7 @@ All methods that can fail will throw exceptions. Always use try-catch blocks:
 
 ```typescript
 try {
-  const storage = new CascStorage();
+  const storage = new Storage();
   storage.open('/path/to/storage');
   
   if (storage.fileExists('some-file.txt')) {

@@ -56,6 +56,6 @@ export interface MPQFile {
   SFileCloseFile(): boolean;
 }
 
-export const Archive: MPQArchiveConstructor = bindings.Archive;
-export const File: new () => MPQFile = bindings.File;
+export const MPQArchiveBinding: MPQArchiveConstructor = bindings.Archive;
+export const MPQFileBinding: new () => MPQFile = bindings.File;
 
