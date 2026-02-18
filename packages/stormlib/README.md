@@ -40,9 +40,9 @@ pnpm add @jamiephan/stormlib
 This package provides two layers of API:
 
 1. **High-level Wrapper API** (Recommended) - `MpqArchive` and `MpqFile` classes with simplified method names
-2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with explicit naming
+2. **Low-level Bindings API** (Advanced) - Direct access to native bindings with exact StormLib.h naming
 
-Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings follow a strict naming convention where C++ functions like `SFileOpenArchive` map to `openArchive` in the bindings.
+Most users should use the high-level wrapper API as shown in all examples below. The low-level bindings use exact names from `StormLib.h`, so C++ functions like `SFileOpenArchive` map directly to `SFileOpenArchive` in the bindings.
 
 For more details, see [BINDING_NAMING_CONVENTION.md](BINDING_NAMING_CONVENTION.md).
 
@@ -60,7 +60,7 @@ import { MpqArchive, MpqFile } from '@jamiephan/stormlib';
 const { MpqArchive, MpqFile } = require('@jamiephan/stormlib');
 
 // Advanced: Direct binding access
-import { Archive, File } from '@jamiephan/stormlib';
+import { Archive, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 ```
 
 ### Opening an MPQ Archive
@@ -805,18 +805,18 @@ archive.create('/path/to/archive.mpq', {
 
 ### Direct Binding Access
 
-For advanced users who need direct access to the native bindings:
+For advanced users who need direct access to the native bindings with exact StormLib.h naming:
 
 ```typescript
-import { Archive, File } from '@jamiephan/stormlib';
+import { Archive, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 
-const archive = new Archive();
-archive.openArchive('/path/to/archive.mpq', 0);
+const archive: MPQArchive = new Archive();
+archive.SFileOpenArchive('/path/to/archive.mpq', 0);
 
-const file = archive.openFileEx('filename.txt', 0);
-const size = file.getFileSize();
-const content = file.readFileAll();
-file.closeFile();
+const file: MPQFile = archive.SFileOpenFileEx('filename.txt', 0);
+const size = file.SFileGetFileSize();
+const content = file.SFileReadFile(size);
+file.SFileCloseFile();
 
 archive.compactArchive();
 archive.closeArchive();

@@ -3,59 +3,59 @@ import * as path from 'path';
 const bindings = require('node-gyp-build')(path.join(__dirname, '..'));
 
 /**
- * Native Archive interface
+ * Native MPQArchive interface
  * Provides direct bindings to StormLib MPQ archive functions
  */
-export interface Archive {
+export interface MPQArchive {
   // Archive operations
-  openArchive(path: string, flags: number): boolean;
-  createArchive(path: string, maxFileCount: number, flags: number): boolean;
-  closeArchive(): boolean;
-  flushArchive(): boolean;
-  compactArchive(): boolean;
+  SFileOpenArchive(path: string, flags: number): boolean;
+  SFileCreateArchive(path: string, maxFileCount: number, flags: number): boolean;
+  SFileCloseArchive(): boolean;
+  SFileFlushArchive(): boolean;
+  SFileCompactArchive(): boolean;
 
   // File operations
-  openFileEx(filename: string, flags: number): File;
-  hasFile(filename: string): boolean;
-  extractFile(source: string, destination: string): boolean;
-  addFile(sourcePath: string, archiveName: string, flags?: number): boolean;
-  addFileEx(sourcePath: string, archiveName: string, flags: number, compression: number, compressionNext: number): boolean;
-  removeFile(filename: string): boolean;
-  renameFile(oldName: string, newName: string): boolean;
+  SFileOpenFileEx(filename: string, flags: number): MPQFile;
+  SFileHasFile(filename: string): boolean;
+  SFileExtractFile(source: string, destination: string): boolean;
+  SFileAddFile(sourcePath: string, archiveName: string, flags?: number): boolean;
+  SFileAddFileEx(sourcePath: string, archiveName: string, flags: number, compression: number, compressionNext: number): boolean;
+  SFileRemoveFile(filename: string): boolean;
+  SFileRenameFile(oldName: string, newName: string): boolean;
 
   // Archive info
-  getMaxFileCount(): number;
-  setMaxFileCount(maxFileCount: number): boolean;
-  getAttributes(): number;
-  setAttributes(attributes: number): boolean;
+  SFileGetMaxFileCount(): number;
+  SFileSetMaxFileCount(maxFileCount: number): boolean;
+  SFileGetAttributes(): number;
+  SFileSetAttributes(attributes: number): boolean;
 
   // Verification
-  verifyFile(filename: string, flags: number): number;
-  verifyArchive(): number;
+  SFileVerifyFile(filename: string, flags: number): number;
+  SFileVerifyArchive(): number;
 }
 
 /**
  * Archive class constructor with static locale methods
  */
-export interface ArchiveConstructor {
-  new (): Archive;
-  getLocale(): number;
-  setLocale(locale: number): number;
+export interface MPQArchiveConstructor {
+  new (): MPQArchive;
+  SFileGetLocale(): number;
+  SFileSetLocale(locale: number): number;
 }
 
 /**
- * Native File interface
+ * Native MPQFile interface
  * Provides direct bindings to StormLib file functions
  */
-export interface File {
-  readFile(bytesToRead: number): Buffer;
-  readFileAll(): Buffer;
-  getFileSize(): number;
-  getFilePointer(): number;
-  setFilePointer(position: number): number;
-  closeFile(): boolean;
+export interface MPQFile {
+  SFileReadFile(bytesToRead: number): Buffer;
+  readFileAll(): Buffer;  // Helper function, not in StormLib.h
+  SFileGetFileSize(): number;
+  SFileGetFilePointer(): number;  // Helper function, uses SFileSetFilePointer
+  SFileSetFilePointer(position: number): number;
+  SFileCloseFile(): boolean;
 }
 
-export const Archive: ArchiveConstructor = bindings.Archive;
-export const File: new () => File = bindings.File;
+export const Archive: MPQArchiveConstructor = bindings.Archive;
+export const File: new () => MPQFile = bindings.File;
 

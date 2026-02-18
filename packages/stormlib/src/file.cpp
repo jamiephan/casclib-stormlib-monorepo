@@ -7,12 +7,12 @@ Napi::Object MpqFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "File", {
-    InstanceMethod("readFile", &MpqFile::Read),
+    InstanceMethod("SFileReadFile", &MpqFile::Read),
     InstanceMethod("readFileAll", &MpqFile::ReadAll),
-    InstanceMethod("getFileSize", &MpqFile::GetSize),
-    InstanceMethod("getFilePointer", &MpqFile::GetPosition),
-    InstanceMethod("setFilePointer", &MpqFile::SetPosition),
-    InstanceMethod("closeFile", &MpqFile::Close)
+    InstanceMethod("SFileGetFileSize", &MpqFile::GetSize),
+    InstanceMethod("SFileGetFilePointer", &MpqFile::GetPosition),
+    InstanceMethod("SFileSetFilePointer", &MpqFile::SetPosition),
+    InstanceMethod("SFileCloseFile", &MpqFile::Close)
   });
 
   constructor = Napi::Persistent(func);

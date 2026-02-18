@@ -8,26 +8,26 @@ Napi::Object MpqArchive::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Archive", {
-    InstanceMethod("openArchive", &MpqArchive::Open),
-    InstanceMethod("createArchive", &MpqArchive::Create),
-    InstanceMethod("closeArchive", &MpqArchive::Close),
-    InstanceMethod("flushArchive", &MpqArchive::Flush),
-    InstanceMethod("compactArchive", &MpqArchive::Compact),
-    InstanceMethod("openFileEx", &MpqArchive::OpenFile),
-    InstanceMethod("hasFile", &MpqArchive::HasFile),
-    InstanceMethod("extractFile", &MpqArchive::ExtractFile),
-    InstanceMethod("addFile", &MpqArchive::AddFile),
-    InstanceMethod("addFileEx", &MpqArchive::AddFileEx),
-    InstanceMethod("removeFile", &MpqArchive::RemoveFile),
-    InstanceMethod("renameFile", &MpqArchive::RenameFile),
-    InstanceMethod("getMaxFileCount", &MpqArchive::GetMaxFileCount),
-    InstanceMethod("setMaxFileCount", &MpqArchive::SetMaxFileCount),
-    InstanceMethod("getAttributes", &MpqArchive::GetAttributes),
-    InstanceMethod("setAttributes", &MpqArchive::SetAttributes),
-    InstanceMethod("verifyFile", &MpqArchive::VerifyFile),
-    InstanceMethod("verifyArchive", &MpqArchive::VerifyArchive),
-    StaticMethod("getLocale", &MpqArchive::GetLocale),
-    StaticMethod("setLocale", &MpqArchive::SetLocale)
+    InstanceMethod("SFileOpenArchive", &MpqArchive::Open),
+    InstanceMethod("SFileCreateArchive", &MpqArchive::Create),
+    InstanceMethod("SFileCloseArchive", &MpqArchive::Close),
+    InstanceMethod("SFileFlushArchive", &MpqArchive::Flush),
+    InstanceMethod("SFileCompactArchive", &MpqArchive::Compact),
+    InstanceMethod("SFileOpenFileEx", &MpqArchive::OpenFile),
+    InstanceMethod("SFileHasFile", &MpqArchive::HasFile),
+    InstanceMethod("SFileExtractFile", &MpqArchive::ExtractFile),
+    InstanceMethod("SFileAddFile", &MpqArchive::AddFile),
+    InstanceMethod("SFileAddFileEx", &MpqArchive::AddFileEx),
+    InstanceMethod("SFileRemoveFile", &MpqArchive::RemoveFile),
+    InstanceMethod("SFileRenameFile", &MpqArchive::RenameFile),
+    InstanceMethod("SFileGetMaxFileCount", &MpqArchive::GetMaxFileCount),
+    InstanceMethod("SFileSetMaxFileCount", &MpqArchive::SetMaxFileCount),
+    InstanceMethod("SFileGetAttributes", &MpqArchive::GetAttributes),
+    InstanceMethod("SFileSetAttributes", &MpqArchive::SetAttributes),
+    InstanceMethod("SFileVerifyFile", &MpqArchive::VerifyFile),
+    InstanceMethod("SFileVerifyArchive", &MpqArchive::VerifyArchive),
+    StaticMethod("SFileGetLocale", &MpqArchive::GetLocale),
+    StaticMethod("SFileSetLocale", &MpqArchive::SetLocale)
   });
 
   constructor = Napi::Persistent(func);

@@ -1,4 +1,9 @@
-import { Archive, File } from './bindings';
+import { 
+  Archive, 
+  File,
+  MPQArchive as MPQArchiveBinding,
+  MPQFile as MPQFileBinding
+} from './bindings';
 
 // Re-export all constants
 export * from './constants';
@@ -46,7 +51,7 @@ export interface AddFileOptions {
  * Provides methods to interact with MPQ archive files
  */
 export class MpqArchive {
-  private archive: Archive;
+  private archive: MPQArchiveBinding;
 
   constructor() {
     this.archive = new Archive();
@@ -57,7 +62,7 @@ export class MpqArchive {
    * This is a static method that affects all archive operations
    */
   static getLocale(): number {
-    return Archive.getLocale();
+    return Archive.SFileGetLocale();
   }
 
   /**
@@ -67,7 +72,7 @@ export class MpqArchive {
    * @returns The previous locale ID
    */
   static setLocale(locale: number): number {
-    return Archive.setLocale(locale);
+    return Archive.SFileSetLocale(locale);
   }
 
   /**
@@ -76,7 +81,7 @@ export class MpqArchive {
    * @param options - Optional opening options
    */
   open(path: string, options?: ArchiveOpenOptions): void {
-    this.archive.openArchive(path, options?.flags || 0);
+    this.archive.SFileOpenArchive(path, options?.flags || 0);
   }
 
   /**
@@ -85,14 +90,14 @@ export class MpqArchive {
    * @param options - Optional creation options
    */
   create(path: string, options?: ArchiveCreateOptions): void {
-    this.archive.createArchive(path, options?.maxFileCount || 1000, options?.flags || 0);
+    this.archive.SFileCreateArchive(path, options?.maxFileCount || 1000, options?.flags || 0);
   }
 
   /**
    * Close the MPQ archive
    */
   close(): boolean {
-    return this.archive.closeArchive();
+    return this.archive.SFileCloseArchive();
   }
 
   /**
@@ -100,7 +105,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   flush(): boolean {
-    return this.archive.flushArchive();
+    return this.archive.SFileFlushArchive();
   }
 
   /**
@@ -108,7 +113,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   compact(): boolean {
-    return this.archive.compactArchive();
+    return this.archive.SFileCompactArchive();
   }
 
   /**
@@ -118,7 +123,7 @@ export class MpqArchive {
    * @returns An MpqFile object
    */
   openFile(filename: string, options?: FileOpenOptions): MpqFile {
-    const file = this.archive.openFileEx(filename, options?.flags || 0);
+    const file = this.archive.SFileOpenFileEx(filename, options?.flags || 0);
     return new MpqFile(file);
   }
 
@@ -128,7 +133,7 @@ export class MpqArchive {
    * @returns true if file exists, false otherwise
    */
   hasFile(filename: string): boolean {
-    return this.archive.hasFile(filename);
+    return this.archive.SFileHasFile(filename);
   }
 
   /**
@@ -138,7 +143,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   extractFile(source: string, destination: string): boolean {
-    return this.archive.extractFile(source, destination);
+    return this.archive.SFileExtractFile(source, destination);
   }
 
   /**
@@ -150,7 +155,7 @@ export class MpqArchive {
    */
   addFile(sourcePath: string, archiveName: string, options?: AddFileOptions): boolean {
     if (options?.compression !== undefined || options?.compressionNext !== undefined) {
-      return this.archive.addFileEx(
+      return this.archive.SFileAddFileEx(
         sourcePath,
         archiveName,
         options.flags || 0,
@@ -158,7 +163,7 @@ export class MpqArchive {
         options.compressionNext || 0
       );
     }
-    return this.archive.addFile(sourcePath, archiveName, options?.flags);
+    return this.archive.SFileAddFile(sourcePath, archiveName, options?.flags);
   }
 
   /**
@@ -177,7 +182,7 @@ export class MpqArchive {
     compression: number,
     compressionNext: number
   ): boolean {
-    return this.archive.addFileEx(sourcePath, archiveName, flags, compression, compressionNext);
+    return this.archive.SFileAddFileEx(sourcePath, archiveName, flags, compression, compressionNext);
   }
 
   /**
@@ -186,7 +191,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   removeFile(filename: string): boolean {
-    return this.archive.removeFile(filename);
+    return this.archive.SFileRemoveFile(filename);
   }
 
   /**
@@ -196,7 +201,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   renameFile(oldName: string, newName: string): boolean {
-    return this.archive.renameFile(oldName, newName);
+    return this.archive.SFileRenameFile(oldName, newName);
   }
 
   /**
@@ -204,7 +209,7 @@ export class MpqArchive {
    * @returns Maximum file count
    */
   getMaxFileCount(): number {
-    return this.archive.getMaxFileCount();
+    return this.archive.SFileGetMaxFileCount();
   }
 
   /**
@@ -213,7 +218,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   setMaxFileCount(maxFileCount: number): boolean {
-    return this.archive.setMaxFileCount(maxFileCount);
+    return this.archive.SFileSetMaxFileCount(maxFileCount);
   }
 
   /**
@@ -221,7 +226,7 @@ export class MpqArchive {
    * @returns Attributes flags
    */
   getAttributes(): number {
-    return this.archive.getAttributes();
+    return this.archive.SFileGetAttributes();
   }
 
   /**
@@ -230,7 +235,7 @@ export class MpqArchive {
    * @returns true if successful
    */
   setAttributes(attributes: number): boolean {
-    return this.archive.setAttributes(attributes);
+    return this.archive.SFileSetAttributes(attributes);
   }
 
   /**
@@ -240,7 +245,7 @@ export class MpqArchive {
    * @returns Verification result flags
    */
   verifyFile(filename: string, flags: number): number {
-    return this.archive.verifyFile(filename, flags);
+    return this.archive.SFileVerifyFile(filename, flags);
   }
 
   /**
@@ -248,7 +253,7 @@ export class MpqArchive {
    * @returns Verification result code (ERROR_NO_SIGNATURE, ERROR_WEAK_SIGNATURE_OK, etc.)
    */
   verifyArchive(): number {
-    return this.archive.verifyArchive();
+    return this.archive.SFileVerifyArchive();
   }
 }
 
@@ -257,9 +262,9 @@ export class MpqArchive {
  * Represents an open file in an MPQ archive
  */
 export class MpqFile {
-  private file: File;
+  private file: MPQFileBinding;
 
-  constructor(file: File) {
+  constructor(file: MPQFileBinding) {
     this.file = file;
   }
 
@@ -269,7 +274,7 @@ export class MpqFile {
    * @returns Buffer containing the read data
    */
   read(bytesToRead?: number): Buffer {
-    return this.file.readFile(bytesToRead || 4096);
+    return this.file.SFileReadFile(bytesToRead || 4096);
   }
 
   /**
@@ -285,7 +290,7 @@ export class MpqFile {
    * @returns File size in bytes
    */
   getSize(): number {
-    return this.file.getFileSize();
+    return this.file.SFileGetFileSize();
   }
 
   /**
@@ -293,7 +298,7 @@ export class MpqFile {
    * @returns Current position in bytes
    */
   getPosition(): number {
-    return this.file.getFilePointer();
+    return this.file.SFileGetFilePointer();
   }
 
   /**
@@ -302,7 +307,7 @@ export class MpqFile {
    * @returns The new position
    */
   setPosition(position: number): number {
-    return this.file.setFilePointer(position);
+    return this.file.SFileSetFilePointer(position);
   }
 
   /**
@@ -310,12 +315,12 @@ export class MpqFile {
    * @returns true if closed successfully
    */
   close(): boolean {
-    return this.file.closeFile();
+    return this.file.SFileCloseFile();
   }
 }
 
 // Export low-level bindings for advanced usage
-export { Archive, File };
+export { Archive, File, MPQArchive, MPQFile } from './bindings';
 
 // Default export
 export default {
