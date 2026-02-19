@@ -7,5 +7,6 @@ module.exports = {
     'lib/**/*.ts',
     '!lib/**/*.d.ts'
   ],
-  coverageDirectory: 'coverage'
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'json-summary', 'lcov']
 };

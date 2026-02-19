@@ -14,6 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        package: [casclib, stormlib]
     
     steps:
       - name: Checkout code
@@ -41,7 +42,10 @@ jobs:
         uses: ArtiomTr/jest-coverage-report-action@v2
         with:
           package-manager: pnpm
-          test-script: pnpm -r --stream test:coverage
+          test-script: pnpm test:coverage
           annotations: coverage
           skip-step: install
-          custom-title: Coverage Report (${{ matrix.os }})
+          working-directory: packages/${{ matrix.package }}
+          coverage-file: ./coverage/coverage-summary.json
+          base-coverage-file: ./coverage/coverage-summary.json
+          custom-title: Coverage Report - ${{ matrix.package }} (${{ matrix.os }})
