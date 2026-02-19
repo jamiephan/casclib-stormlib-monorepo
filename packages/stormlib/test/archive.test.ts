@@ -5,7 +5,7 @@ import * as os from "os";
 
 // Helper to get unique test directory
 const getTestDir = (testName: string): string => {
-  return path.join(os.tmpdir(), "STORMLIB_TEST", testName);
+  return path.join(os.tmpdir(), "STORMLIB_TEST", "archive", testName);
 };
 
 // Helper to ensure directory exists
@@ -30,7 +30,13 @@ const createTestFile = (filePath: string, content: string): void => {
 
 // Clean up entire STORMLIB_TEST folder before all tests
 beforeAll(() => {
-  const stormlibTestDir = path.join(os.tmpdir(), "STORMLIB_TEST");
+  const stormlibTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "archive");
+  cleanupDir(stormlibTestDir);
+  ensureDir(stormlibTestDir);
+});
+
+afterAll(() => {
+  const stormlibTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "archive");
   cleanupDir(stormlibTestDir);
 });
 
@@ -45,7 +51,6 @@ describe("Archive.create() and Archive.close()", () => {
     }).not.toThrow();
     expect(fs.existsSync(archivePath)).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should close an archive successfully", () => {
@@ -56,7 +61,6 @@ describe("Archive.create() and Archive.close()", () => {
     archive.create(archivePath);
     const result = archive.close();
     expect(result).toBe(true);
-    cleanupDir(testDir);
   });
 });
 
@@ -70,7 +74,6 @@ describe("Archive.flush()", () => {
     const result = archive.flush();
     expect(result).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -84,7 +87,6 @@ describe("Archive.compact()", () => {
     const result = archive.compact();
     expect(result).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -102,7 +104,6 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     const result = archive.addFile(sourceFile, "test.txt");
     expect(result).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should extract a file from the archive", () => {
@@ -124,7 +125,6 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(fs.existsSync(extractedFile)).toBe(true);
     expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should add a file to a subfolder in the archive", () => {
@@ -139,7 +139,6 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("mods/a/b/test.txt")).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should extract a file from a subfolder in the archive", () => {
@@ -161,7 +160,6 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(fs.existsSync(extractedFile)).toBe(true);
     expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -181,7 +179,6 @@ describe("Archive.removeFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("test.txt")).toBe(false);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should remove a file from a subfolder in the archive", () => {
@@ -199,7 +196,6 @@ describe("Archive.removeFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("mods/a/b/test.txt")).toBe(false);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -220,7 +216,6 @@ describe("Archive.renameFile()", () => {
     expect(archive.hasFile("old.txt")).toBe(false);
     expect(archive.hasFile("new.txt")).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should rename a file in a subfolder", () => {
@@ -239,7 +234,6 @@ describe("Archive.renameFile()", () => {
     expect(archive.hasFile("mods/a/b/old.txt")).toBe(false);
     expect(archive.hasFile("mods/a/b/new.txt")).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -254,7 +248,6 @@ describe("Archive.getMaxFileCount() and Archive.setMaxFileCount()", () => {
     expect(typeof maxCount).toBe("number");
     expect(maxCount).toBeGreaterThan(0);
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should set the maximum file count", () => {
@@ -266,7 +259,6 @@ describe("Archive.getMaxFileCount() and Archive.setMaxFileCount()", () => {
     const result = archive.setMaxFileCount(500);
     expect(result).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -280,7 +272,6 @@ describe("Archive.getAttributes()", () => {
     const attributes = archive.getAttributes();
     expect(typeof attributes).toBe("number");
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -305,7 +296,6 @@ describe("File.read()", () => {
     expect(data.length).toBeGreaterThan(0);
     file.close();
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -330,7 +320,6 @@ describe("File.readAll()", () => {
     expect(data.toString()).toBe(testContent);
     file.close();
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should read all data from a file in a subfolder", () => {
@@ -351,7 +340,6 @@ describe("File.readAll()", () => {
     expect(data.toString()).toBe(testContent);
     file.close();
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -376,7 +364,6 @@ describe("File.getSize()", () => {
     expect(size).toBe(testContent.length);
     file.close();
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -397,7 +384,6 @@ describe("File.close()", () => {
     const result = file.close();
     expect(result).toBe(true);
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -479,7 +465,6 @@ describe("Archive.listFiles()", () => {
     expect(fileNames).toContain("file2.txt");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should list files in subfolders", () => {
@@ -504,7 +489,6 @@ describe("Archive.listFiles()", () => {
     expect(fileNames).toContain("mods/b/file2.txt");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should return file info with correct properties", () => {
@@ -528,7 +512,6 @@ describe("Archive.listFiles()", () => {
     expect(typeof file?.locale).toBe("number");
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -554,7 +537,6 @@ describe("Archive.findFiles()", () => {
     expect(hasTxt).toBe(true);
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should find all files with wildcard", () => {
@@ -575,7 +557,6 @@ describe("Archive.findFiles()", () => {
     expect(allFiles!.length).toBeGreaterThanOrEqual(2);
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should find files in subfolders with patterns", () => {
@@ -602,7 +583,6 @@ describe("Archive.findFiles()", () => {
     expect(fileNames).toContain("mods/c/other.txt");
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -619,7 +599,6 @@ describe("Archive.isPatchedArchive()", () => {
     expect(isPatched).toBe(false);
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -645,7 +624,6 @@ describe("Archive.getFileChecksums()", () => {
     }
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -675,7 +653,6 @@ describe("File.write() and File.finish()", () => {
     readFile.close();
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -698,7 +675,6 @@ describe("File.getFileName()", () => {
     expect(fileName).toContain("test.txt");
     file.close();
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -716,7 +692,6 @@ describe("Archive.verifyArchive()", () => {
     expect(result).toBeGreaterThanOrEqual(0);
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -737,7 +712,6 @@ describe("Archive.signArchive()", () => {
     }
     
     archive.close();
-    cleanupDir(testDir);
   });
 });
 
@@ -757,7 +731,6 @@ describe("Archive utility methods", () => {
     expect(content).toBe("Hello, World!");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should read file as JSON", () => {
@@ -776,7 +749,6 @@ describe("Archive utility methods", () => {
     expect(json.name).toBe("test");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should get file names", () => {
@@ -798,7 +770,6 @@ describe("Archive utility methods", () => {
     expect(names).toContain("test.json");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should check if file can be opened", () => {
@@ -818,7 +789,6 @@ describe("Archive utility methods", () => {
     expect(cannotOpen).toBe(false);
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should get total size", () => {
@@ -836,7 +806,6 @@ describe("Archive utility methods", () => {
     expect(totalSize).toBeGreaterThan(0);
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should get compression ratio", () => {
@@ -855,7 +824,6 @@ describe("Archive utility methods", () => {
     // Note: Compression ratio can be > 1 for small files where compression overhead exceeds savings
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should read file as string from subfolder", () => {
@@ -873,7 +841,6 @@ describe("Archive utility methods", () => {
     expect(content).toBe("Hello, World!");
     
     archive.close();
-    cleanupDir(testDir);
   });
 
   it("should read file as JSON from subfolder", () => {
@@ -892,6 +859,5 @@ describe("Archive utility methods", () => {
     expect(json.name).toBe("test");
     
     archive.close();
-    cleanupDir(testDir);
   });
 });

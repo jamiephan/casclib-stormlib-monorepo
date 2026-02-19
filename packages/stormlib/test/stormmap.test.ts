@@ -3,11 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-// Helper to get unique test directory
-const getTestDir = (testName: string): string => {
-  return path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", testName);
-};
-
 // Helper to ensure directory exists
 const ensureDir = (dir: string): void => {
   if (!fs.existsSync(dir)) {
@@ -33,35 +28,27 @@ const stormmapDir = path.join(__dirname, "files", "hero", "s2ma");
 const alteracPassMap = path.join(stormmapDir, "AlteracPass20260219.stormmap");
 const tutorialMap = path.join(stormmapDir, "ManualTutorialMapMechanics20260219.stormmap");
 
-// Clean up stormmap test folder before all tests
+
+// Clean up entire STORMLIB_TEST folder before all tests
 beforeAll(() => {
-  const stormmapTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap");
-  cleanupDir(stormmapTestDir);
+  const stormlibTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap");
+  cleanupDir(stormlibTestDir);
+  ensureDir(stormlibTestDir);
 });
 
 afterAll(() => {
-  const stormmapTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap");
-  cleanupDir(stormmapTestDir);
+  const stormlibTestDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap");
+  cleanupDir(stormlibTestDir);
 });
 
+
 describe("StormMap Basic Open/Close Tests", () => {
-  const testDir = getTestDir("basic-open-close");
-  let alteracPassCopy: string;
-  let tutorialMapCopy: string;
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
-    tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
-    fs.copyFileSync(alteracPassMap, alteracPassCopy);
-    fs.copyFileSync(tutorialMap, tutorialMapCopy);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should open and close AlteracPass20260219.stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "basic-open-close", "test1");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     const result = archive.close();
@@ -69,6 +56,11 @@ describe("StormMap Basic Open/Close Tests", () => {
   });
 
   it("should open and close ManualTutorialMapMechanics20260219.stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "basic-open-close", "test2");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     const result = archive.close();
@@ -77,20 +69,12 @@ describe("StormMap Basic Open/Close Tests", () => {
 });
 
 describe("AlteracPass20260219.stormmap - MapScript.galaxy", () => {
-  const testDir = getTestDir("alterac-mapscript");
-  let alteracPassCopy: string;
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
-    fs.copyFileSync(alteracPassMap, alteracPassCopy);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should contain MapScript.galaxy file", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-mapscript", "test1");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     expect(archive.hasFile("MapScript.galaxy")).toBe(true);
@@ -98,6 +82,11 @@ describe("AlteracPass20260219.stormmap - MapScript.galaxy", () => {
   });
 
   it("should read MapScript.galaxy and contain 'Alterac Pass'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-mapscript", "test2");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     const file = archive.openFile("MapScript.galaxy");
@@ -108,6 +97,11 @@ describe("AlteracPass20260219.stormmap - MapScript.galaxy", () => {
   });
 
   it("should read MapScript.galaxy and contain 'InitMap'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-mapscript", "test3");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     const file = archive.openFile("MapScript.galaxy");
@@ -119,20 +113,12 @@ describe("AlteracPass20260219.stormmap - MapScript.galaxy", () => {
 });
 
 describe("AlteracPass20260219.stormmap - GameStrings.txt", () => {
-  const testDir = getTestDir("alterac-gamestrings");
-  let alteracPassCopy: string;
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
-    fs.copyFileSync(alteracPassMap, alteracPassCopy);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should contain enUS.StormData\\LocalizedData\\GameStrings.txt file", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-gamestrings", "test1");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     expect(archive.hasFile("enUS.StormData\\LocalizedData\\GameStrings.txt")).toBe(true);
@@ -140,6 +126,11 @@ describe("AlteracPass20260219.stormmap - GameStrings.txt", () => {
   });
 
   it("should read GameStrings.txt and contain 'DocInfo/Name=Alterac Pass'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-gamestrings", "test2");
+    ensureDir(testDir);
+    const alteracPassCopy = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, alteracPassCopy);
+    
     const archive = new Archive();
     archive.open(alteracPassCopy);
     const file = archive.openFile("enUS.StormData\\LocalizedData\\GameStrings.txt");
@@ -151,20 +142,12 @@ describe("AlteracPass20260219.stormmap - GameStrings.txt", () => {
 });
 
 describe("ManualTutorialMapMechanics20260219.stormmap - mapscript.galaxy", () => {
-  const testDir = getTestDir("tutorial-mapscript");
-  let tutorialMapCopy: string;
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
-    fs.copyFileSync(tutorialMap, tutorialMapCopy);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should contain mapscript.galaxy file (lowercase)", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-mapscript", "test1");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     expect(archive.hasFile("mapscript.galaxy")).toBe(true);
@@ -172,6 +155,11 @@ describe("ManualTutorialMapMechanics20260219.stormmap - mapscript.galaxy", () =>
   });
 
   it("should read mapscript.galaxy and contain 'Tutorial Map Mechanics'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-mapscript", "test2");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     const file = archive.openFile("mapscript.galaxy");
@@ -182,6 +170,11 @@ describe("ManualTutorialMapMechanics20260219.stormmap - mapscript.galaxy", () =>
   });
 
   it("should read mapscript.galaxy and contain 'InitMap'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-mapscript", "test3");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     const file = archive.openFile("mapscript.galaxy");
@@ -193,20 +186,12 @@ describe("ManualTutorialMapMechanics20260219.stormmap - mapscript.galaxy", () =>
 });
 
 describe("ManualTutorialMapMechanics20260219.stormmap - gamestrings.txt", () => {
-  const testDir = getTestDir("tutorial-gamestrings");
-  let tutorialMapCopy: string;
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
-    fs.copyFileSync(tutorialMap, tutorialMapCopy);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should contain enus.stormdata\\localizeddata\\gamestrings.txt file (lowercase)", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-gamestrings", "test1");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     expect(archive.hasFile("enus.stormdata\\localizeddata\\gamestrings.txt")).toBe(true);
@@ -214,6 +199,11 @@ describe("ManualTutorialMapMechanics20260219.stormmap - gamestrings.txt", () => 
   });
 
   it("should read gamestrings.txt and contain 'DocInfo/Name=Tutorial Map Mechanics'", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-gamestrings", "test2");
+    ensureDir(testDir);
+    const tutorialMapCopy = path.join(testDir, "Tutorial.stormmap");
+    fs.copyFileSync(tutorialMap, tutorialMapCopy);
+    
     const archive = new Archive();
     archive.open(tutorialMapCopy);
     const file = archive.openFile("enus.stormdata\\localizeddata\\gamestrings.txt");
@@ -225,21 +215,13 @@ describe("ManualTutorialMapMechanics20260219.stormmap - gamestrings.txt", () => 
 });
 
 describe("StormMap File Operations - Add, Remove, Rename", () => {
-  const testDir = getTestDir("file-operations");
-  const testArchivePath = path.join(testDir, "test-operations.stormmap");
-  const sourceFile = path.join(testDir, "source.txt");
-  const testContent = "Test content for file operations";
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, testContent);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should add a file to a stormmap archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "file-operations", "test1");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "test-operations.stormmap");
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content for file operations");
+    
     const archive = new Archive();
     archive.create(testArchivePath);
     
@@ -251,6 +233,12 @@ describe("StormMap File Operations - Add, Remove, Rename", () => {
   });
 
   it("should remove a file from a stormmap archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "file-operations", "test2");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "test-operations.stormmap");
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content for file operations");
+    
     const archive = new Archive();
     archive.create(testArchivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -264,6 +252,12 @@ describe("StormMap File Operations - Add, Remove, Rename", () => {
   });
 
   it("should rename a file in a stormmap archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "file-operations", "test3");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "test-operations.stormmap");
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content for file operations");
+    
     const archive = new Archive();
     archive.create(testArchivePath);
     archive.addFile(sourceFile, "old-name.txt");
@@ -279,24 +273,11 @@ describe("StormMap File Operations - Add, Remove, Rename", () => {
 });
 
 describe("StormMap File Count Operations", () => {
-  const testDir = getTestDir("file-count");
-  const testArchivePath = path.join(testDir, "test-count.stormmap");
-  const sourceFile1 = path.join(testDir, "source1.txt");
-  const sourceFile2 = path.join(testDir, "source2.txt");
-  const sourceFile3 = path.join(testDir, "source3.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile1, "Content 1");
-    createTestFile(sourceFile2, "Content 2");
-    createTestFile(sourceFile3, "Content 3");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get and set max file count for stormmap archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "file-count", "test1");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "test-count.stormmap");
+    
     const archive = new Archive();
     archive.create(testArchivePath, { maxFileCount: 100 });
     
@@ -313,6 +294,16 @@ describe("StormMap File Count Operations", () => {
   });
 
   it("should add multiple files to stormmap archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "file-count", "test2");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "test-count.stormmap");
+    const sourceFile1 = path.join(testDir, "source1.txt");
+    const sourceFile2 = path.join(testDir, "source2.txt");
+    const sourceFile3 = path.join(testDir, "source3.txt");
+    createTestFile(sourceFile1, "Content 1");
+    createTestFile(sourceFile2, "Content 2");
+    createTestFile(sourceFile3, "Content 3");
+    
     const archive = new Archive();
     archive.create(testArchivePath);
     
@@ -329,22 +320,14 @@ describe("StormMap File Count Operations", () => {
 });
 
 describe("AlteracPass20260219.stormmap - Modify Operations", () => {
-  const testDir = getTestDir("alterac-modify");
-  const testArchivePath = path.join(testDir, "AlteracPass-copy.stormmap");
-  const newFile = path.join(testDir, "new-file.txt");
-
-  beforeEach(() => {
+  it("should add a new file to AlteracPass stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-modify", "test1");
     ensureDir(testDir);
-    // Copy the original stormmap to a test location
+    const testArchivePath = path.join(testDir, "AlteracPass-copy.stormmap");
+    const newFile = path.join(testDir, "new-file.txt");
     fs.copyFileSync(alteracPassMap, testArchivePath);
     createTestFile(newFile, "New test file content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
-  it("should add a new file to AlteracPass stormmap", () => {
+    
     const archive = new Archive();
     archive.open(testArchivePath);
     
@@ -357,6 +340,11 @@ describe("AlteracPass20260219.stormmap - Modify Operations", () => {
   });
 
   it("should extract and re-add a file to AlteracPass stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "alterac-modify", "test2");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "AlteracPass-copy.stormmap");
+    fs.copyFileSync(alteracPassMap, testArchivePath);
+    
     const archive = new Archive();
     archive.open(testArchivePath);
     
@@ -379,22 +367,14 @@ describe("AlteracPass20260219.stormmap - Modify Operations", () => {
 });
 
 describe("ManualTutorialMapMechanics20260219.stormmap - Modify Operations", () => {
-  const testDir = getTestDir("tutorial-modify");
-  const testArchivePath = path.join(testDir, "Tutorial-copy.stormmap");
-  const newFile = path.join(testDir, "new-file.txt");
-
-  beforeEach(() => {
+  it("should add a new file to Tutorial stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-modify", "test1");
     ensureDir(testDir);
-    // Copy the original stormmap to a test location
+    const testArchivePath = path.join(testDir, "Tutorial-copy.stormmap");
+    const newFile = path.join(testDir, "new-file.txt");
     fs.copyFileSync(tutorialMap, testArchivePath);
     createTestFile(newFile, "New tutorial file content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
-  it("should add a new file to Tutorial stormmap", () => {
+    
     const archive = new Archive();
     archive.open(testArchivePath);
     
@@ -407,6 +387,13 @@ describe("ManualTutorialMapMechanics20260219.stormmap - Modify Operations", () =
   });
 
   it("should rename a file in Tutorial stormmap", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "tutorial-modify", "test2");
+    ensureDir(testDir);
+    const testArchivePath = path.join(testDir, "Tutorial-copy.stormmap");
+    const newFile = path.join(testDir, "new-file.txt");
+    fs.copyFileSync(tutorialMap, testArchivePath);
+    createTestFile(newFile, "New tutorial file content");
+    
     const archive = new Archive();
     archive.open(testArchivePath);
     
