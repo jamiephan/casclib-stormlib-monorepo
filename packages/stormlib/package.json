@@ -6,21 +6,18 @@
     "type": "git",
     "url": "https://github.com/jamiephan/casclib-stormlib-monorepo.git"
   },
-  "main": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.js",
-      "types": "./dist/types/index.d.ts"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
     "install": "node-gyp-build",
-    "build": "pnpm build:ts:esm && pnpm build:ts:cjs && pnpm build:ts:types",
-    "build:ts:esm": "tsc --moduleResolution bundler --module esnext --outDir dist/esm",
-    "build:ts:cjs": "tsc --module commonjs --outDir dist/cjs",
-    "build:ts:types": "tsc --declaration --emitDeclarationOnly --outDir dist/types",
+    "build": "tsc && node ../../scripts/generate-esm.js",
     "rebuild": "node-gyp-build && pnpm build",
     "prebuild": "prebuildify --napi --strip",
     "clean": "node-gyp clean && rimraf dist",
