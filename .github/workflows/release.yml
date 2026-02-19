@@ -1,0 +1,353 @@
+name: Create Tag and Publish Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v1.0.0)'
+        required: true
+        type: string
+      npm_tag:
+        description: 'NPM distribution tag'
+        required: true
+        type: choice
+        options:
+          - latest
+          - dev
+        default: latest
+
+permissions:
+  contents: write
+  id-token: write  # Required for npm provenance
+
+jobs:
+  create-tag:
+    name: Create and Push Tag
+    runs-on: ubuntu-latest
+    # Only allow running on master branch
+    if: github.ref == 'refs/heads/master'
+    outputs:
+      package: ${{ steps.parse.outputs.package }}
+      version: ${{ steps.parse.outputs.version }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper tagging
+          ref: master
+          submodules: recursive  # Include third-party submodules
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Validate tag format
+        run: |
+          TAG="${{ inputs.tag }}"
+          echo "Creating tag: $TAG"
+          
+          # Validate tag format (casclib/v* or stormlib/v*)
+          if [[ ! "$TAG" =~ ^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "Error: Tag must be in format 'casclib/vX.Y.Z' or 'stormlib/vX.Y.Z'"
+            echo "Examples: casclib/v1.0.0, stormlib/v2.1.0-beta.1"
+            exit 1
+          fi
+          
+          echo "Tag format validation passed"
+      
+      - name: Check if tag already exists
+        run: |
+          TAG="${{ inputs.tag }}"
+          
+          echo "Checking if tag $TAG already exists..."
+          
+          # Fetch all tags from remote
+          git fetch --tags
+          
+          # Check if tag exists locally or remotely
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "❌ Error: Tag $TAG already exists locally"
+            exit 1
+          fi
+          
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "❌ Error: Tag $TAG already exists on remote"
+            exit 1
+          fi
+          
+          echo "✓ Tag $TAG does not exist, safe to create"
+      
+      - name: Parse tag components
+        id: parse
+        run: |
+          TAG="${{ inputs.tag }}"
+          
+          # Extract package name (casclib or stormlib)
+          PACKAGE=$(echo "$TAG" | cut -d'/' -f1)
+          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
+          
+          # Extract version (remove 'v' prefix)
+          VERSION=$(echo "$TAG" | cut -d'/' -f2 | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Detect if prerelease (contains - or +)
+          if [[ "$VERSION" =~ [+-] ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "Prerelease: true"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "Prerelease: false"
+          fi
+          
+          echo "Package: $PACKAGE"
+          echo "Version: $VERSION"
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Update package.json version
+        run: |
+          PACKAGE="${{ steps.parse.outputs.package }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          PACKAGE_JSON="packages/$PACKAGE/package.json"
+          
+          echo "Updating $PACKAGE_JSON to version $VERSION"
+          
+          # Update version in package.json using node
+          node -e "
+            const fs = require('fs');
+            const path = '$PACKAGE_JSON';
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          echo "✓ Updated package.json version to $VERSION"
+      
+      - name: Commit version bump
+        run: |
+          PACKAGE="${{ steps.parse.outputs.package }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          
+          git add "packages/$PACKAGE/package.json"
+          git commit -m "chore: [AUTOMATION] Bump $PACKAGE to v$VERSION"
+          
+          echo "✓ Committed version bump"
+      
+      - name: Push commit to master
+        run: |
+          git push origin master
+          echo "✓ Pushed commit to master"
+      
+      - name: Create and push tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "✓ Successfully created and pushed tag: $TAG"
+      
+      - name: Summary
+        run: |
+          TAG="${{ inputs.tag }}"
+          NPM_TAG="${{ inputs.npm_tag }}"
+          echo "### ✓ Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The tag has been pushed and package build will now begin." >> $GITHUB_STEP_SUMMARY
+
+  # Build prebuilds for all platforms and Node versions
+  build:
+    name: Build ${{ matrix.os }} - Node ${{ matrix.node }}
+    needs: create-tag
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            node: 22
+          - os: windows-latest
+            arch: x64
+            node: 22
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master  # Use master after tag is created
+          submodules: recursive
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build TypeScript
+        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        run: pnpm run build
+
+      - name: Create prebuild
+        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        run: pnpm run prebuild
+
+      - name: Run tests
+        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        run: pnpm test
+        env:
+          CI: true
+
+      - name: Upload prebuild
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-${{ runner.os }}-${{ matrix.arch }}-node${{ matrix.node }}
+          path: packages/${{ needs.create-tag.outputs.package }}/prebuilds/**/*
+          retention-days: 7
+
+  # Publish to npm with all prebuilds
+  publish:
+    name: Publish to npm
+    needs: [create-tag, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master  # Use master after tag is created
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build TypeScript
+        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        run: pnpm run build
+
+      - name: Download all prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: prebuilds-*
+
+      - name: Organize prebuilds
+        run: |
+          mkdir -p packages/${{ needs.create-tag.outputs.package }}/prebuilds
+          
+          # Copy all prebuilds to the package directory
+          for artifact in artifacts/prebuilds-*; do
+            if [ -d "$artifact" ]; then
+              echo "Processing $artifact"
+              cp -r "$artifact"/* packages/${{ needs.create-tag.outputs.package }}/prebuilds/ || true
+            fi
+          done
+          
+          # List all prebuilds
+          echo "Available prebuilds:"
+          find packages/${{ needs.create-tag.outputs.package }}/prebuilds -name "*.node" -o -name "*.json"
+
+      - name: Update npm
+        run: npm install -g npm@latest
+        
+      - name: Publish to npm
+        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        run: npm publish --provenance --access public --tag ${{ inputs.npm_tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: '@jamiephan/${{ needs.create-tag.outputs.package }} v${{ needs.create-tag.outputs.version }}'
+          draft: false
+          prerelease: ${{ needs.create-tag.outputs.is_prerelease == 'true' }}
+          generate_release_notes: true
+          body: |            
+            ${{ needs.create-tag.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
+
+            ## Installation
+            ```bash
+            npm install @jamiephan/${{ needs.create-tag.outputs.package }}@${{ needs.create-tag.outputs.version }}
+            ```
+            
+            ${{ needs.create-tag.outputs.is_prerelease == 'true' && format('Or install with the npm tag: `npm install @jamiephan/{0}@{1}`', needs.create-tag.outputs.package, inputs.npm_tag) || '' }}
+
+            ## Supported Platforms
+            This release includes prebuilt N-API binaries for:
+            - **Linux (x64)** - Node.js 22
+            - **Windows (x64)** - Node.js 22
+
+            If your platform is not listed, the package will build from source automatically.
+
+            ## Documentation
+            For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.create-tag.outputs.package }}/README.md).
+
+          # files: |
+          #   packages/${{ needs.create-tag.outputs.package }}/prebuilds/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on related PRs
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const package = '${{ needs.create-tag.outputs.package }}';
+            const version = '${{ needs.create-tag.outputs.version }}';
+            const tag = '${{ inputs.tag }}';
+            
+            // Find recent merged PRs (last 10)
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 10
+            });
+
+            const mergedPRs = pulls.filter(pr => pr.merged_at);
+
+            for (const pr of mergedPRs.slice(0, 5)) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: `🎉 **@jamiephan/${package}** \`v${version}\` has been published!\n\n` +
+                      `This PR's changes are now available on npm.\n\n` +
+                      `📦 Install: \`npm install @jamiephan/${package}@${version}\`\n` +
+                      `🏷️ Release: [${tag}](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tag})`
+              });
+            }
