@@ -40,6 +40,7 @@ jobs:
           submodules: recursive  # Include third-party submodules
       
       - name: Validate tag format
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           echo "Validating tag: $TAG"
@@ -54,6 +55,7 @@ jobs:
           echo "Tag format validation passed"
       
       - name: Check if tag already exists
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           
@@ -77,6 +79,7 @@ jobs:
       
       - name: Parse tag components
         id: parse
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           
@@ -101,6 +104,7 @@ jobs:
           echo "Version: $VERSION"
       
       - name: Summary
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           NPM_TAG="${{ inputs.npm_tag }}"
@@ -146,6 +150,7 @@ jobs:
           version: 8
 
       - name: Update package.json version (temporary)
+        shell: bash
         run: |
           PACKAGE="${{ needs.validate.outputs.package }}"
           VERSION="${{ needs.validate.outputs.version }}"
@@ -206,6 +211,7 @@ jobs:
           submodules: recursive
 
       - name: Configure Git
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -222,6 +228,7 @@ jobs:
           version: 8
 
       - name: Update package.json version
+        shell: bash
         run: |
           PACKAGE="${{ needs.validate.outputs.package }}"
           VERSION="${{ needs.validate.outputs.version }}"
@@ -254,6 +261,7 @@ jobs:
           pattern: prebuilds-*
 
       - name: Organize prebuilds
+        shell: bash
         run: |
           mkdir -p packages/${{ needs.validate.outputs.package }}/prebuilds
           
@@ -279,6 +287,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version bump
+        shell: bash
         run: |
           PACKAGE="${{ needs.validate.outputs.package }}"
           VERSION="${{ needs.validate.outputs.version }}"
@@ -289,12 +298,14 @@ jobs:
           echo "✓ Committed version bump"
       
       - name: Create tag
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           git tag "$TAG"
           echo "✓ Created tag: $TAG"
       
       - name: Push commit and tag
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           git push origin master
@@ -335,6 +346,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
+        shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           VERSION="${{ needs.validate.outputs.version }}"
