@@ -11,7 +11,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: write
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -44,6 +43,5 @@ jobs:
         with:
           package-manager: pnpm
           test-script: pnpm exec jest --ci --json --coverage --testLocationInResults --outputFile=report.json
-          annotations: coverage
           working-directory: packages/${{ matrix.package }}
           custom-title: Coverage Report - ${{ matrix.package }} (${{ matrix.os }})
