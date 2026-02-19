@@ -76,5 +76,5 @@ Edit `.devcontainer/devcontainer.json` to:
 ✅ **Consistent environment** - Same setup for all developers  
 ✅ **Isolated dependencies** - No conflicts with host system  
 ✅ **Pre-configured tools** - All build tools ready to go  
-✅ **Cross-platform** - Works on Windows, macOS, and Linux  
+✅ **Cross-platform** - Works on Windows and Linux  
 ✅ **Easy onboarding** - New developers can start immediately

@@ -14,7 +14,7 @@ jobs:
       checks: write
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
         package: [casclib, stormlib]
     
     steps:
