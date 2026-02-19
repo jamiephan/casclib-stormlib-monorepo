@@ -17,9 +17,14 @@ private:
   // Methods
   Napi::Value Read(const Napi::CallbackInfo& info);
   Napi::Value ReadAll(const Napi::CallbackInfo& info);
+  Napi::Value Write(const Napi::CallbackInfo& info);
+  Napi::Value Finish(const Napi::CallbackInfo& info);
   Napi::Value GetSize(const Napi::CallbackInfo& info);
   Napi::Value GetPosition(const Napi::CallbackInfo& info);
   Napi::Value SetPosition(const Napi::CallbackInfo& info);
+  Napi::Value GetFileName(const Napi::CallbackInfo& info);
+  Napi::Value SetLocale(const Napi::CallbackInfo& info);
+  Napi::Value GetFileInfo(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
 
   // Member variables

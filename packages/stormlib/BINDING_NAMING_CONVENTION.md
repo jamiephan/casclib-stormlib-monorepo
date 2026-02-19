@@ -33,6 +33,17 @@ This ensures direct correspondence between the C++ API and JavaScript bindings f
 | `SFileSetAttributes` | `SFileSetAttributes` | Set archive attributes |
 | `SFileVerifyFile` | `SFileVerifyFile` | Verify file integrity |
 | `SFileVerifyArchive` | `SFileVerifyArchive` | Verify archive integrity |
+| `SFileSignArchive` | `SFileSignArchive` | Sign archive with signature |
+| `SFileGetFileChecksums` | `SFileGetFileChecksums` | Get file CRC32 and MD5 |
+| `SFileAddListFile` | `SFileAddListFile` | Add listfile to archive |
+| `SFileOpenPatchArchive` | `SFileOpenPatchArchive` | Open patch archive |
+| `SFileIsPatchedArchive` | `SFileIsPatchedArchive` | Check if patched |
+| `SFileFindFirstFile` | `SFileFindFirstFile` | Find files in archive |
+| `SFileEnumLocales` | `SFileEnumLocales` | Enumerate file locales |
+| `SFileCreateFile` | `SFileCreateFile` | Create file in archive |
+| `SFileAddWave` | `SFileAddWave` | Add wave file |
+| `SFileUpdateFileAttributes` | `SFileUpdateFileAttributes` | Update file attributes |
+| `SFileGetFileInfo` | `SFileGetFileInfo` | Get archive/file info |
 | `SFileGetLocale` | `SFileGetLocale` | Get locale (static) |
 | `SFileSetLocale` | `SFileSetLocale` | Set locale (static) |
 
@@ -41,9 +52,14 @@ This ensures direct correspondence between the C++ API and JavaScript bindings f
 | C++ Function | JS Binding | Description |
 |---|---|---|
 | `SFileReadFile` | `SFileReadFile` | Read data from file |
+| `SFileWriteFile` | `SFileWriteFile` | Write data to file |
+| `SFileFinishFile` | `SFileFinishFile` | Finish writing file |
 | `SFileGetFileSize` | `SFileGetFileSize` | Get file size |
 | `SFileGetFilePointer` | `SFileGetFilePointer` | Get current position |
 | `SFileSetFilePointer` | `SFileSetFilePointer` | Set file position |
+| `SFileGetFileName` | `SFileGetFileName` | Get file name |
+| `SFileSetFileLocale` | `SFileSetFileLocale` | Set file locale |
+| `SFileGetFileInfo` | `SFileGetFileInfo` | Get file info |
 | `SFileCloseFile` | `SFileCloseFile` | Close the file |
 
 ## Examples

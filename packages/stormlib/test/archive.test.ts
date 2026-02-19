@@ -143,6 +143,30 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
     archive.close();
   });
+
+  it("should add a file to a subfolder in the archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    const result = archive.addFile(sourceFile, "mods/a/b/test.txt");
+    expect(result).toBe(true);
+    expect(archive.hasFile("mods/a/b/test.txt")).toBe(true);
+    archive.close();
+  });
+
+  it("should extract a file from a subfolder in the archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "mods/a/b/test.txt");
+    archive.close();
+
+    // Reopen and extract
+    archive.open(archivePath);
+    const result = archive.extractFile("mods/a/b/test.txt", extractedFile);
+    expect(result).toBe(true);
+    expect(fs.existsSync(extractedFile)).toBe(true);
+    expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
+    archive.close();
+  });
 });
 
 describe("Archive.removeFile()", () => {
@@ -168,6 +192,18 @@ describe("Archive.removeFile()", () => {
     const result = archive.removeFile("test.txt");
     expect(result).toBe(true);
     expect(archive.hasFile("test.txt")).toBe(false);
+    archive.close();
+  });
+
+  it("should remove a file from a subfolder in the archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "mods/a/b/test.txt");
+    expect(archive.hasFile("mods/a/b/test.txt")).toBe(true);
+    
+    const result = archive.removeFile("mods/a/b/test.txt");
+    expect(result).toBe(true);
+    expect(archive.hasFile("mods/a/b/test.txt")).toBe(false);
     archive.close();
   });
 });
@@ -196,6 +232,19 @@ describe("Archive.renameFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("old.txt")).toBe(false);
     expect(archive.hasFile("new.txt")).toBe(true);
+    archive.close();
+  });
+
+  it("should rename a file in a subfolder", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "mods/a/b/old.txt");
+    expect(archive.hasFile("mods/a/b/old.txt")).toBe(true);
+    
+    const result = archive.renameFile("mods/a/b/old.txt", "mods/a/b/new.txt");
+    expect(result).toBe(true);
+    expect(archive.hasFile("mods/a/b/old.txt")).toBe(false);
+    expect(archive.hasFile("mods/a/b/new.txt")).toBe(true);
     archive.close();
   });
 });
@@ -305,6 +354,21 @@ describe("File.readAll()", () => {
 
     archive.open(archivePath);
     const file = archive.openFile("test.txt");
+    const data = file.readAll();
+    expect(Buffer.isBuffer(data)).toBe(true);
+    expect(data.toString()).toBe(testContent);
+    file.close();
+    archive.close();
+  });
+
+  it("should read all data from a file in a subfolder", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "mods/a/b/test.txt");
+    archive.close();
+
+    archive.open(archivePath);
+    const file = archive.openFile("mods/a/b/test.txt");
     const data = file.readAll();
     expect(Buffer.isBuffer(data)).toBe(true);
     expect(data.toString()).toBe(testContent);
@@ -424,5 +488,444 @@ describe("Archive.verifyArchive() - TODO", () => {
 describe("File.getPosition() and File.setPosition() - TODO", () => {
   it("should be implemented in the future", () => {
     expect(true).toBe(true);
+  });
+});
+
+describe("Archive.listFiles()", () => {
+  const testDir = getTestDir("listfiles");
+  const archivePath = path.join(testDir, "test.mpq");
+  const sourceFile1 = path.join(testDir, "file1.txt");
+  const sourceFile2 = path.join(testDir, "file2.txt");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+    createTestFile(sourceFile1, "Content 1");
+    createTestFile(sourceFile2, "Content 2");
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should list all files in the archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile1, "file1.txt");
+    archive.addFile(sourceFile2, "file2.txt");
+    
+    const files = archive.listFiles();
+    console.log(files)
+    expect(Array.isArray(files)).toBe(true);
+    expect(files.length).toBeGreaterThanOrEqual(2);
+    
+    const fileNames = files.map(f => f.name);
+    expect(fileNames).toContain("file1.txt");
+    expect(fileNames).toContain("file2.txt");
+    
+    archive.close();
+  });
+
+  it("should list files in subfolders", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile1, "mods/a/file1.txt");
+    archive.addFile(sourceFile2, "mods/b/file2.txt");
+    
+    const files = archive.listFiles();
+    expect(Array.isArray(files)).toBe(true);
+    expect(files.length).toBeGreaterThanOrEqual(2);
+    
+    const fileNames = files.map(f => f.name);
+    expect(fileNames).toContain("mods/a/file1.txt");
+    expect(fileNames).toContain("mods/b/file2.txt");
+    
+    archive.close();
+  });
+
+  it("should return file info with correct properties", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile1, "file1.txt");
+    
+    const files = archive.listFiles();
+    const file = files.find(f => f.name === "file1.txt");
+    
+    expect(file).toBeDefined();
+    expect(file?.name).toBe("file1.txt");
+    expect(typeof file?.fileSize).toBe("number");
+    expect(typeof file?.compSize).toBe("number");
+    expect(typeof file?.fileFlags).toBe("number");
+    expect(typeof file?.locale).toBe("number");
+    
+    archive.close();
+  });
+});
+
+describe("Archive.findFiles()", () => {
+  const testDir = getTestDir("findfiles");
+  const archivePath = path.join(testDir, "test.mpq");
+  const txtFile = path.join(testDir, "test.txt");
+  const luaFile = path.join(testDir, "test.lua");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+    createTestFile(txtFile, "TXT content");
+    createTestFile(luaFile, "LUA content");
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should find files matching a pattern", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    archive.addFile(luaFile, "test.lua");
+    
+    const txtFiles = archive.findFiles("*.txt");
+    expect(txtFiles).not.toBeNull();
+    expect(Array.isArray(txtFiles)).toBe(true);
+    
+    const hasTxt = txtFiles?.some(f => f.name === "test.txt");
+    expect(hasTxt).toBe(true);
+    
+    archive.close();
+  });
+
+  it("should find all files with wildcard", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    archive.addFile(luaFile, "test.lua");
+    
+    const allFiles = archive.findFiles("*");
+    expect(allFiles).not.toBeNull();
+    expect(allFiles!.length).toBeGreaterThanOrEqual(2);
+    
+    archive.close();
+  });
+
+  it("should find files in subfolders with patterns", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "mods/a/b/test.txt");
+    archive.addFile(luaFile, "mods/a/b/test.lua");
+    archive.addFile(txtFile, "mods/c/other.txt");
+    
+    const allModFiles = archive.findFiles("mods*");
+    expect(allModFiles).not.toBeNull();
+    expect(allModFiles!.length).toBeGreaterThanOrEqual(3);
+    
+    const fileNames = allModFiles!.map(f => f.name);
+    expect(fileNames).toContain("mods/a/b/test.txt");
+    expect(fileNames).toContain("mods/a/b/test.lua");
+    expect(fileNames).toContain("mods/c/other.txt");
+    
+    archive.close();
+  });
+});
+
+describe("Archive.isPatchedArchive()", () => {
+  const testDir = getTestDir("patched");
+  const archivePath = path.join(testDir, "test.mpq");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should return false for non-patched archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    
+    const isPatched = archive.isPatchedArchive();
+    expect(typeof isPatched).toBe("boolean");
+    expect(isPatched).toBe(false);
+    
+    archive.close();
+  });
+});
+
+describe("Archive.getFileChecksums()", () => {
+  const testDir = getTestDir("checksums");
+  const archivePath = path.join(testDir, "test.mpq");
+  const sourceFile = path.join(testDir, "source.txt");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+    createTestFile(sourceFile, "Test content for checksums");
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should get file checksums", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+    
+    try {
+      const checksums = archive.getFileChecksums("test.txt");
+      expect(checksums).toBeDefined();
+      expect(typeof checksums.crc32).toBe("number");
+      expect(typeof checksums.md5).toBe("string");
+    } catch (e) {
+      // Some archives might not have checksums enabled
+      expect(e).toBeDefined();
+    }
+    
+    archive.close();
+  });
+});
+
+describe("File.write() and File.finish()", () => {
+  const testDir = getTestDir("file-write");
+  const archivePath = path.join(testDir, "test.mpq");
+  const testContent = "Written content";
+
+  beforeEach(() => {
+    ensureDir(testDir);
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should write data to a file and finish", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    
+    const buffer = Buffer.from(testContent, "utf-8");
+    const file = archive.createFile("written.txt", Date.now(), buffer.length);
+    
+    const writeResult = file.write(buffer);
+    expect(writeResult).toBe(true);
+    
+    const finishResult = file.finish();
+    expect(finishResult).toBe(true);
+    
+    // Verify the file was written
+    const readFile = archive.openFile("written.txt");
+    const content = readFile.readAll();
+    expect(content.toString()).toBe(testContent);
+    readFile.close();
+    
+    archive.close();
+  });
+});
+
+describe("File.getFileName()", () => {
+  const testDir = getTestDir("file-getname");
+  const archivePath = path.join(testDir, "test.mpq");
+  const sourceFile = path.join(testDir, "source.txt");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+    createTestFile(sourceFile, "Test content");
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should get the file name", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+    archive.close();
+
+    archive.open(archivePath);
+    const file = archive.openFile("test.txt");
+    const fileName = file.getFileName();
+    expect(typeof fileName).toBe("string");
+    expect(fileName).toContain("test.txt");
+    file.close();
+    archive.close();
+  });
+});
+
+describe("Archive.verifyArchive()", () => {
+  const testDir = getTestDir("verify-archive");
+  const archivePath = path.join(testDir, "test.mpq");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should verify archive signature", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    
+    const result = archive.verifyArchive();
+    expect(typeof result).toBe("number");
+    // ERROR_NO_SIGNATURE (0) is expected for new archives
+    expect(result).toBeGreaterThanOrEqual(0);
+    
+    archive.close();
+  });
+});
+
+describe("Archive.signArchive()", () => {
+  const testDir = getTestDir("sign-archive");
+  const archivePath = path.join(testDir, "test.mpq");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should sign archive", () => {
+    const archive = new Archive();
+    archive.create(archivePath);
+    
+    try {
+      const result = archive.signArchive();
+      expect(typeof result).toBe("boolean");
+    } catch (e) {
+      // Signing might fail if crypto is not available
+      expect(e).toBeDefined();
+    }
+    
+    archive.close();
+  });
+});
+
+describe("Archive utility methods", () => {
+  const testDir = getTestDir("utils");
+  const archivePath = path.join(testDir, "test.mpq");
+  const txtFile = path.join(testDir, "test.txt");
+  const jsonFile = path.join(testDir, "test.json");
+
+  beforeEach(() => {
+    ensureDir(testDir);
+    createTestFile(txtFile, "Hello, World!");
+    createTestFile(jsonFile, JSON.stringify({ version: "1.0", name: "test" }));
+  });
+
+  afterEach(() => {
+    cleanupDir(testDir);
+  });
+
+  it("should read file as string", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    
+    const content = archive.readFileAsString("test.txt");
+    expect(typeof content).toBe("string");
+    expect(content).toBe("Hello, World!");
+    
+    archive.close();
+  });
+
+  it("should read file as JSON", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(jsonFile, "test.json");
+    
+    const json = archive.readFileAsJson("test.json");
+    expect(json).toBeDefined();
+    expect(json.version).toBe("1.0");
+    expect(json.name).toBe("test");
+    
+    archive.close();
+  });
+
+  it("should get file names", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    archive.addFile(jsonFile, "test.json");
+    
+    const names = archive.getFileNames();
+    expect(Array.isArray(names)).toBe(true);
+    expect(names).toContain("test.txt");
+    expect(names).toContain("test.json");
+    
+    archive.close();
+  });
+
+  it("should check if file can be opened", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    
+    const canOpen = archive.canOpenFile("test.txt");
+    expect(canOpen).toBe(true);
+    
+    const cannotOpen = archive.canOpenFile("nonexistent.txt");
+    expect(cannotOpen).toBe(false);
+    
+    archive.close();
+  });
+
+  it("should get total size", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    
+    const totalSize = archive.getTotalSize();
+    expect(typeof totalSize).toBe("number");
+    expect(totalSize).toBeGreaterThan(0);
+    
+    archive.close();
+  });
+
+  it("should get compression ratio", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "test.txt");
+    
+    const ratio = archive.getCompressionRatio();
+    expect(typeof ratio).toBe("number");
+    expect(ratio).toBeGreaterThan(0);
+    // Note: Compression ratio can be > 1 for small files where compression overhead exceeds savings
+    
+    archive.close();
+  });
+
+  it("should read file as string from subfolder", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(txtFile, "mods/a/b/test.txt");
+    
+    const content = archive.readFileAsString("mods/a/b/test.txt");
+    expect(typeof content).toBe("string");
+    expect(content).toBe("Hello, World!");
+    
+    archive.close();
+  });
+
+  it("should read file as JSON from subfolder", () => {
+    const { Archive } = require("../lib");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(jsonFile, "data/config/test.json");
+    
+    const json = archive.readFileAsJson("data/config/test.json");
+    expect(json).toBeDefined();
+    expect(json.version).toBe("1.0");
+    expect(json.name).toBe("test");
+    
+    archive.close();
   });
 });

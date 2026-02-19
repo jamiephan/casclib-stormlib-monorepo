@@ -9,9 +9,14 @@ Napi::Object MpqFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::Function func = DefineClass(env, "File", {
     InstanceMethod("SFileReadFile", &MpqFile::Read),
     InstanceMethod("readFileAll", &MpqFile::ReadAll),
+    InstanceMethod("SFileWriteFile", &MpqFile::Write),
+    InstanceMethod("SFileFinishFile", &MpqFile::Finish),
     InstanceMethod("SFileGetFileSize", &MpqFile::GetSize),
     InstanceMethod("SFileGetFilePointer", &MpqFile::GetPosition),
     InstanceMethod("SFileSetFilePointer", &MpqFile::SetPosition),
+    InstanceMethod("SFileGetFileName", &MpqFile::GetFileName),
+    InstanceMethod("SFileSetFileLocale", &MpqFile::SetLocale),
+    InstanceMethod("SFileGetFileInfo", &MpqFile::GetFileInfo),
     InstanceMethod("SFileCloseFile", &MpqFile::Close)
   });
 
@@ -160,3 +165,138 @@ Napi::Value MpqFile::Close(const Napi::CallbackInfo& info) {
 
   return Napi::Boolean::New(env, true);
 }
+
+Napi::Value MpqFile::Write(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsBuffer()) {
+    Napi::TypeError::New(env, "Expected buffer as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  Napi::Buffer<uint8_t> buffer = info[0].As<Napi::Buffer<uint8_t>>();
+  DWORD compression = MPQ_COMPRESSION_ZLIB;
+
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    compression = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  if (!SFileWriteFile(hFile, buffer.Data(), buffer.Length(), compression)) {
+    Napi::Error::New(env, "Failed to write to file")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqFile::Finish(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (!SFileFinishFile(hFile)) {
+    Napi::Error::New(env, "Failed to finish file")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  // File is closed after finishing
+  hFile = nullptr;
+  isOpen = false;
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqFile::GetFileName(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  char filename[MAX_PATH];
+  if (!SFileGetFileName(hFile, filename)) {
+    Napi::Error::New(env, "Failed to get file name")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::String::New(env, filename);
+}
+
+Napi::Value MpqFile::SetLocale(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected locale as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  LCID newLocale = info[0].As<Napi::Number>().Uint32Value();
+
+  if (!SFileSetFileLocale(hFile, newLocale)) {
+    Napi::Error::New(env, "Failed to set file locale")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqFile::GetFileInfo(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "Expected info class as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  SFileInfoClass infoClass = (SFileInfoClass)info[0].As<Napi::Number>().Uint32Value();
+  DWORD lengthNeeded = 0;
+
+  // First call to get size needed
+  SFileGetFileInfo(hFile, infoClass, nullptr, 0, &lengthNeeded);
+
+  if (lengthNeeded == 0) {
+    return env.Null();
+  }
+
+  // Allocate buffer and get info
+  std::vector<uint8_t> buffer(lengthNeeded);
+  if (!SFileGetFileInfo(hFile, infoClass, buffer.data(), lengthNeeded, nullptr)) {
+    Napi::Error::New(env, "Failed to get file info")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  return Napi::Buffer<uint8_t>::Copy(env, buffer.data(), lengthNeeded);
+}
+
