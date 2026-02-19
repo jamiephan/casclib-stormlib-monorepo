@@ -24,8 +24,6 @@ packages/
 thirdparty/
   CascLib/          # Git submodule - C++ library sources
   StormLib/         # Git submodule - C++ library sources
-scripts/
-  generate-esm.js   # Creates ESM wrappers for dual-format exports
 ```
 
 ### Build Process (Critical!)
@@ -40,19 +38,11 @@ The build happens in **three stages**:
    - `lib/bindings.ts` loads `.node` binary via `node-gyp-build()`
    - `lib/index.ts` wraps raw bindings with friendly class APIs
 
-3. **ESM Wrapper Generation**: `node ../../scripts/generate-esm.js`
-   - Creates `dist/index.mjs` + `dist/bindings.mjs` 
-   - Uses `createRequire()` pattern to re-export CommonJS as ESM
-   - Enables dual-format support without dual compilation
-
-**Run with**: `pnpm rebuild` (runs all stages) or `pnpm build` (TypeScript + ESM only)
-
 ### Module System Design
 
 **Intentional dual-format strategy**:
 - Native bindings compile once to CommonJS (`.node` files are inherently CJS)
 - TypeScript wraps bindings in CJS format (`dist/index.js`)
-- `generate-esm.js` creates lightweight ESM wrappers that `require()` the CJS build
 - `package.json` exports map both formats via conditional exports
 
 **Why not native ESM?** Native addons require CommonJS `require()` - ESM wrappers bridge the gap.
@@ -127,9 +117,6 @@ pnpm -r --filter casclib test  # Single package
 
 **Import errors after changes**
 → Forgot to run build: `pnpm build` (TypeScript) or `pnpm rebuild` (native)
-
-**ESM imports broken**
-→ Missing `.mjs` files: `node ../../scripts/generate-esm.js` ran?
 
 **Platform-specific build issues**
 → Check [.github/workflows/build.yml](.github/workflows/release.yml) for required system dependencies
@@ -225,7 +212,6 @@ Pattern: Classes with `open()` need `close()`. Document in method JSDoc.
 ## Key Files
 
 - [packages/\*/binding.gyp](packages/casclib/binding.gyp) - Native build config (includes third-party sources)
-- [scripts/generate-esm.js](scripts/generate-esm.js) - ESM wrapper generator
 - [packages/\*/lib/bindings.ts](packages/casclib/lib/bindings.ts) - Raw N-API interface definitions
 - [packages/\*/lib/index.ts](packages/casclib/lib/index.ts) - User-facing wrapper classes
 - [.github/workflows/build.yml](.github/workflows/build.yml) - Multi-platform CI configuration

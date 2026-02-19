@@ -9,7 +9,7 @@
     "outDir": "./dist",
     "rootDir": "./",
     "composite": false,
-    "removeComments": true,
+    "removeComments": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
