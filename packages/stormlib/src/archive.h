@@ -4,6 +4,11 @@
 #include <napi.h>
 #include "StormLib.h"
 
+// Define INVALID_HANDLE_VALUE for non-Windows platforms
+#ifndef INVALID_HANDLE_VALUE
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+#endif
+
 class MpqArchive : public Napi::ObjectWrap<MpqArchive> {
 public:
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
