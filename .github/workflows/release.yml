@@ -128,6 +128,9 @@ jobs:
           - os: windows-latest
             arch: x64
             node: 22
+          - os: macos-latest
+            arch: arm64
+            node: 22
 
     runs-on: ${{ matrix.os }}
 
@@ -331,6 +334,7 @@ jobs:
             This release includes prebuilt N-API binaries for:
             - **Linux (x64)** - Node.js 22
             - **Windows (x64)** - Node.js 22
+            - **macOS (arm64)** - Node.js 22
 
             If your platform is not listed, the package will build from source automatically.
 

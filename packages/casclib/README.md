@@ -113,7 +113,7 @@ const storage = new Storage();
 // Windows - Basic usage with cache folder and product code
 storage.openOnline('C:/Temp/CASC/Cache*hero');
 
-// Linux - Basic usage
+// Linux/MacOS - Basic usage
 storage.openOnline('/tmp/casc/cache*hero');
 
 // With CDN server specified
@@ -238,7 +238,7 @@ Opens an online CASC storage.
 - `path`: Connection string in the format: `local_cache_folder[*cdn_server_url]*code_name[*region]`
   - `local_cache_folder`: Local cache directory for downloaded game data (reusable across runs)
     - Windows: `C:/Temp/CASC/Cache`
-    - Linux: `/tmp/casc/cache`
+    - Linux/MacOS: `/tmp/casc/cache`
   - `cdn_server_url`: Optional CDN server URL (e.g., `http://us.patch.battle.net:1119`). If omitted, uses default CDN
   - `code_name`: TACT product code - see [TACT documentation](https://wowdev.wiki/TACT) for available codes
     - Examples: `hero` (Heroes of the Storm), `wow` (World of Warcraft), `s2` (StarCraft II), `d3` (Diablo III)
@@ -250,7 +250,7 @@ Opens an online CASC storage.
 // Windows - Minimal format: cache folder and product code
 storage.openOnline('C:/Temp/CASC/Cache*hero');
 
-// Linux - Minimal format
+// Linux/MacOS - Minimal format
 storage.openOnline('/tmp/casc/cache*hero');
 
 // With CDN server specified
