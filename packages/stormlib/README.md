@@ -4,15 +4,15 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 
 ## Features
 
-- ✅ Read and write MPQ archives
-- ✅ Extract files from classic Blizzard games
-- ✅ Create new archives and modify existing ones
-- ✅ File compression and encryption support
-- ✅ TypeScript support with full type definitions
-- ✅ Cross-platform (Windows, Linux)
-- ✅ Both CommonJS and ES Module support
-- ✅ High-level wrapper API for ease of use
-- ✅ Low-level bindings for advanced usage
+- Read and write MPQ archives
+- Extract files from classic Blizzard games
+- Create new archives and modify existing ones
+- File compression and encryption support
+- TypeScript support with full type definitions
+- Cross-platform (Windows, Linux)
+- Both CommonJS and ES Module support
+- High-level wrapper API for ease of use
+- Low-level bindings for advanced usage
 
 ## Supported Games
 
@@ -183,6 +183,147 @@ async function processArchive() {
 processArchive();
 ```
 
+### Advanced Examples
+
+#### Listing All Files in an Archive
+
+```typescript
+import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
+
+const archive = new Archive();
+archive.open('/path/to/game.mpq');
+
+// List all files
+const files = archive.listFiles();
+console.log(`Archive contains ${files.length} files`);
+
+files.forEach(fileInfo => {
+  console.log(`${fileInfo.name}`);
+  console.log(`  Size: ${fileInfo.fileSize} bytes`);
+  console.log(`  Compressed: ${fileInfo.compSize} bytes`);
+  console.log(`  Flags: 0x${fileInfo.fileFlags.toString(16)}`);
+  console.log(`  Locale: ${fileInfo.locale}`);
+});
+
+// Or use utility function
+const fileNames = ArchiveUtils.getFileNames(archive);
+console.log('Files:', fileNames.join(', '));
+
+archive.close();
+```
+
+#### Working with Patches
+
+```typescript
+import { Archive } from '@jamiephan/stormlib';
+
+const archive = new Archive();
+archive.open('/path/to/base.mpq');
+
+// Open patch archive
+archive.openPatchArchive('/path/to/patch-1.mpq');
+archive.openPatchArchive('/path/to/patch-2.mpq');
+
+// Check if patched
+if (archive.isPatchedArchive()) {
+  console.log('Archive has patches applied');
+}
+
+// Files will be read with patches applied
+const file = archive.openFile('some-file.txt');
+const content = file.readAll();
+file.close();
+
+archive.close();
+```
+
+#### Creating Files Programmatically
+
+```typescript
+import { Archive, MPQ_FILE_COMPRESS, MPQ_COMPRESSION_ZLIB } from '@jamiephan/stormlib';
+
+const archive = new Archive();
+archive.create('/path/to/new.mpq', { maxFileCount: 100 });
+
+// Create a new file in the archive
+const data = Buffer.from('Hello, World!', 'utf-8');
+const file = archive.createFile('greeting.txt', Date.now(), data.length);
+
+// Write data
+file.write(data, MPQ_COMPRESSION_ZLIB);
+
+// Finish and close the file
+file.finish();
+
+archive.close();
+```
+
+#### Archive Verification and Signing
+
+```typescript
+import { Archive, SFILE_VERIFY_ALL } from '@jamiephan/stormlib';
+
+const archive = new Archive();
+archive.open('/path/to/archive.mpq');
+
+// Verify archive signature
+const signatureResult = archive.verifyArchive();
+console.log(`Signature verification: ${signatureResult}`);
+
+// Verify a specific file
+const fileResult = archive.verifyFile('war3map.j', SFILE_VERIFY_ALL);
+console.log(`File verification: ${fileResult}`);
+
+// Get file checksums
+const checksums = archive.getFileChecksums('war3map.j');
+console.log(`CRC32: 0x${checksums.crc32.toString(16)}`);
+console.log(`MD5: ${checksums.md5}`);
+
+// Sign the archive
+archive.signArchive();
+
+archive.close();
+```
+
+#### Using ArchiveUtils for Batch Operations
+
+```typescript
+import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const archive = new Archive();
+archive.open('/path/to/game.mpq');
+
+// Extract all Lua scripts
+const extracted = ArchiveUtils.extractAllFiles(
+  archive, 
+  '/output/scripts', 
+  '*.lua'
+);
+console.log(`Extracted ${extracted} Lua files`);
+
+// Read configuration as JSON
+try {
+  const config = ArchiveUtils.readFileAsJson(archive, 'config.json');
+  console.log('Configuration:', config);
+} catch (e) {
+  console.error('No config.json found');
+}
+
+// Get compression statistics
+const totalSize = ArchiveUtils.getTotalSize(archive);
+const compressedSize = ArchiveUtils.getTotalCompressedSize(archive);
+const ratio = ArchiveUtils.getCompressionRatio(archive);
+
+console.log(`Total size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+console.log(`Compressed: ${(compressedSize / 1024 / 1024).toFixed(2)} MB`);
+console.log(`Compression: ${(ratio * 100).toFixed(1)}%`);
+console.log(`Space saved: ${((1 - ratio) * 100).toFixed(1)}%`);
+
+archive.close();
+```
+
 ## API Reference
 
 ### Archive
@@ -336,6 +477,187 @@ Verifies the archive signature.
 ```typescript
 const result = archive.verifyArchive();
 console.log(`Verification result: ${result}`);
+```
+
+##### `signArchive(signatureType?: number): boolean`
+Signs the archive with a digital signature.
+
+**Parameters:**
+- `signatureType`: Type of signature to apply (default: 0)
+
+**Returns:** `true` if signed successfully
+
+**Example:**
+```typescript
+archive.signArchive();
+```
+
+##### `getFileChecksums(filename: string): { crc32: number; md5: string }`
+Gets the CRC32 checksum and MD5 hash for a file.
+
+**Parameters:**
+- `filename`: Name of the file
+
+**Returns:** Object containing `crc32` (number) and `md5` (string)
+
+**Example:**
+```typescript
+const checksums = archive.getFileChecksums('war3map.j');
+console.log(`CRC32: ${checksums.crc32}, MD5: ${checksums.md5}`);
+```
+
+##### `addListFile(listfilePath: string): number`
+Adds a listfile to the archive.
+
+**Parameters:**
+- `listfilePath`: Path to the listfile
+
+**Returns:** Number of entries added
+
+**Example:**
+```typescript
+const added = archive.addListFile('/path/to/listfile.txt');
+console.log(`Added ${added} listfile entries`);
+```
+
+##### `openPatchArchive(patchPath: string, patchPrefix?: string, flags?: number): boolean`
+Opens a patch archive for the current archive.
+
+**Parameters:**
+- `patchPath`: Path to the patch archive
+- `patchPrefix`: Optional patch path prefix
+- `flags`: Optional flags (default: 0)
+
+**Returns:** `true` if patch opened successfully
+
+**Example:**
+```typescript
+archive.openPatchArchive('/path/to/patch.mpq');
+archive.openPatchArchive('/path/to/patch.mpq', 'base');
+```
+
+##### `isPatchedArchive(): boolean`
+Checks if the archive has patches applied.
+
+**Returns:** `true` if archive has patches
+
+**Example:**
+```typescript
+if (archive.isPatchedArchive()) {
+  console.log('This archive has patches');
+}
+```
+
+##### `findFiles(mask?: string): FileInfo[] | null`
+Finds all files in the archive matching a mask pattern.
+
+**Parameters:**
+- `mask`: File mask with wildcards (default: "*")
+
+**Returns:** Array of file information objects, or `null` if no files found
+
+**Example:**
+```typescript
+// Find all files
+const allFiles = archive.findFiles();
+
+// Find specific pattern
+const jsFiles = archive.findFiles('*.j');
+
+// Process results
+allFiles?.forEach(file => {
+  console.log(`${file.name} - ${file.fileSize} bytes`);
+});
+```
+
+##### `listFiles(): FileInfo[]`
+Lists all files in the archive.
+
+**Returns:** Array of file information objects (empty array if no files)
+
+**Example:**
+```typescript
+const files = archive.listFiles();
+files.forEach(file => {
+  console.log(`${file.name}: ${file.fileSize} bytes (compressed: ${file.compSize})`);
+});
+```
+
+##### `enumLocales(filename: string, searchScope?: number): number[]`
+Enumerates available locales for a specific file.
+
+**Parameters:**
+- `filename`: Name of the file
+- `searchScope`: Search scope (default: 0)
+
+**Returns:** Array of locale IDs
+
+**Example:**
+```typescript
+const locales = archive.enumLocales('war3map.j');
+console.log(`Available locales: ${locales.join(', ')}`);
+```
+
+##### `createFile(filename: string, fileTime: number, fileSize: number, locale?: number, flags?: number): File`
+Creates a new file in the archive for writing.
+
+**Parameters:**
+- `filename`: Name of the file to create
+- `fileTime`: File timestamp
+- `fileSize`: Size of the file
+- `locale`: Locale ID (default: 0)
+- `flags`: File flags (default: 0)
+
+**Returns:** File object for writing
+
+**Example:**
+```typescript
+const file = archive.createFile('newfile.txt', Date.now(), 100);
+file.write(Buffer.from('Hello, world!'));
+file.finish();
+```
+
+##### `addWave(sourcePath: string, archiveName: string, flags?: number, quality?: number): boolean`
+Adds a wave audio file to the archive with compression.
+
+**Parameters:**
+- `sourcePath`: Path to the wave file on disk
+- `archiveName`: Name for the file in the archive
+- `flags`: File flags (default: 0)
+- `quality`: Compression quality (default: 1, range: 0-2)
+
+**Returns:** `true` if added successfully
+
+**Example:**
+```typescript
+import { MPQ_FILE_COMPRESS, MPQ_WAVE_QUALITY_HIGH } from '@jamiephan/stormlib';
+archive.addWave('/audio/sound.wav', 'sound.wav', MPQ_FILE_COMPRESS, MPQ_WAVE_QUALITY_HIGH);
+```
+
+##### `updateFileAttributes(filename: string): boolean`
+Updates attributes for a specific file in the archive.
+
+**Parameters:**
+- `filename`: Name of the file
+
+**Returns:** `true` if updated successfully
+
+**Example:**
+```typescript
+archive.updateFileAttributes('war3map.j');
+```
+
+##### `getFileInfo(infoClass: number): Buffer | null`
+Gets archive or file information.
+
+**Parameters:**
+- `infoClass`: Information class to retrieve
+
+**Returns:** Buffer containing the info data, or `null` if unavailable
+
+**Example:**
+```typescript
+const info = archive.getFileInfo(0);
 ```
 
 ##### Static Methods
@@ -586,6 +908,212 @@ Closes the file and releases resources.
 file.close();
 ```
 
+##### `write(data: Buffer, compression?: number): boolean`
+Writes data to the file (for files created with `archive.createFile()`).
+
+**Parameters:**
+- `data`: Buffer containing data to write
+- `compression`: Compression method (default: ZLIB)
+
+**Returns:** `true` if written successfully
+
+**Example:**
+```typescript
+import { MPQ_COMPRESSION_ZLIB } from '@jamiephan/stormlib';
+const file = archive.createFile('newfile.txt', Date.now(), 13);
+file.write(Buffer.from('Hello, world!'), MPQ_COMPRESSION_ZLIB);
+file.finish();
+```
+
+##### `finish(): boolean`
+Finishes writing to the file and closes it.
+
+**Returns:** `true` if finished successfully
+
+**Example:**
+```typescript
+file.write(Buffer.from('data'));
+file.finish();
+```
+
+##### `getFileName(): string`
+Gets the filename of the currently open file.
+
+**Returns:** The filename as a string
+
+**Example:**
+```typescript
+const name = file.getFileName();
+console.log(`Current file: ${name}`);
+```
+
+##### `setLocale(locale: number): boolean`
+Sets the locale for the file.
+
+**Parameters:**
+- `locale`: Locale ID to set
+
+**Returns:** `true` if set successfully
+
+**Example:**
+```typescript
+file.setLocale(0);
+```
+
+##### `getFileInfo(infoClass: number): Buffer | null`
+Gets file information.
+
+**Parameters:**
+- `infoClass`: Information class to retrieve
+
+**Returns:** Buffer containing the info data, or `null` if unavailable
+
+**Example:**
+```typescript
+const info = file.getFileInfo(0);
+```
+
+---
+
+## Utility Functions
+
+### ArchiveUtils
+
+The `ArchiveUtils` namespace provides utility functions for common archive operations:
+
+#### `readFileAsString(archive: Archive, filename: string, encoding?: BufferEncoding): string`
+Reads a file from the archive as a string.
+
+**Parameters:**
+- `archive`: Archive instance
+- `filename`: Name of the file to read
+- `encoding`: Text encoding (default: 'utf-8')
+
+**Returns:** File content as string
+
+**Example:**
+```typescript
+import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
+
+const archive = new Archive();
+archive.open('/path/to/archive.mpq');
+
+const content = ArchiveUtils.readFileAsString(archive, 'script.lua');
+console.log(content);
+```
+
+#### `readFileAsJson<T>(archive: Archive, filename: string): T`
+Reads a file from the archive and parses it as JSON.
+
+**Parameters:**
+- `archive`: Archive instance
+- `filename`: Name of the JSON file
+
+**Returns:** Parsed JSON object
+
+**Example:**
+```typescript
+interface Config {
+  version: string;
+  settings: Record<string, any>;
+}
+
+const config = ArchiveUtils.readFileAsJson<Config>(archive, 'config.json');
+console.log(`Version: ${config.version}`);
+```
+
+####` extractAllFiles(archive: Archive, outputDir: string, mask?: string): number`
+Extracts all files matching a mask to a directory.
+
+**Parameters:**
+- `archive`: Archive instance
+- `outputDir`: Output directory path
+- `mask`: File mask to filter (default: "*")
+
+**Returns:** Number of files extracted
+
+**Example:**
+```typescript
+const extracted = ArchiveUtils.extractAllFiles(archive, '/output/dir');
+console.log(`Extracted ${extracted} files`);
+
+// Extract only .j files
+const jFiles = ArchiveUtils.extractAllFiles(archive, '/output/dir', '*.j');
+```
+
+#### `getFileNames(archive: Archive, mask?: string): string[]`
+Gets all file names in the archive.
+
+**Parameters:**
+- `archive`: Archive instance
+- `mask`: File mask to filter (default: "*")
+
+**Returns:** Array of file names
+
+**Example:**
+```typescript
+const allFiles = ArchiveUtils.getFileNames(archive);
+const scripts = ArchiveUtils.getFileNames(archive, '*.lua');
+```
+
+#### `canOpenFile(archive: Archive, filename: string): boolean`
+Checks if a file exists and can be opened.
+
+**Parameters:**
+- `archive`: Archive instance
+- `filename`: Name of the file
+
+**Returns:** `true` if file can be opened
+
+**Example:**
+```typescript
+if (ArchiveUtils.canOpenFile(archive, 'war3map.j')) {
+  console.log('File is accessible');
+}
+```
+
+#### `getTotalSize(archive: Archive): number`
+Gets the total uncompressed size of all files.
+
+**Parameters:**
+- `archive`: Archive instance
+
+**Returns:** Total size in bytes
+
+**Example:**
+```typescript
+const totalSize = ArchiveUtils.getTotalSize(archive);
+console.log(`Total: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+```
+
+#### `getTotalCompressedSize(archive: Archive): number`
+Gets the total compressed size of all files.
+
+**Parameters:**
+- `archive`: Archive instance
+
+**Returns:** Total compressed size in bytes
+
+**Example:**
+```typescript
+const compSize = ArchiveUtils.getTotalCompressedSize(archive);
+console.log(`Compressed: ${(compSize / 1024 / 1024).toFixed(2)} MB`);
+```
+
+#### `getCompressionRatio(archive: Archive): number`
+Calculates the compression ratio for the archive.
+
+**Parameters:**
+- `archive`: Archive instance
+
+**Returns:** Compression ratio (0.0 to 1.0)
+
+**Example:**
+```typescript
+const ratio = ArchiveUtils.getCompressionRatio(archive);
+console.log(`Compression ratio: ${(ratio * 100).toFixed(1)}%`);
+```
+
 ---
 
 ## TypeScript Interfaces
@@ -616,7 +1144,32 @@ interface AddFileOptions {
   /** Compression method for subsequent sectors */
   compressionNext?: number;
 }
+
+interface FileInfo {
+  /** Full file name in the archive */
+  name: string;
+  /** Plain file name without path */
+  plainName: string;
+  /** Hash table index */
+  hashIndex: number;
+  /** Block table index */
+  blockIndex: number;
+  /** Uncompressed file size in bytes */
+  fileSize: number;
+  /** File flags (MPQ_FILE_*) */
+  fileFlags: number;
+  /** Compressed file size in bytes */
+  compSize: number;
+  /** File time (low 32 bits) */
+  fileTimeLo: number;
+  /** File time (high 32 bits) */
+  fileTimeHi: number;
+  /** Locale ID */
+  locale: number;
+}
 ```
+
+The `FileInfo` interface is returned by `archive.findFiles()` and `archive.listFiles()` methods and contains comprehensive metadata about files in the archive.
 
 ## Exported Constants
 

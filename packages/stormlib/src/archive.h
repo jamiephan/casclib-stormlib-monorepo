@@ -4,6 +4,11 @@
 #include <napi.h>
 #include "StormLib.h"
 
+// Define INVALID_HANDLE_VALUE for non-Windows platforms
+#ifndef INVALID_HANDLE_VALUE
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+#endif
+
 class MpqArchive : public Napi::ObjectWrap<MpqArchive> {
 public:
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
@@ -38,6 +43,27 @@ private:
   // Verification
   Napi::Value VerifyFile(const Napi::CallbackInfo& info);
   Napi::Value VerifyArchive(const Napi::CallbackInfo& info);
+  Napi::Value SignArchive(const Napi::CallbackInfo& info);
+  Napi::Value GetFileChecksums(const Napi::CallbackInfo& info);
+  
+  // Listfile operations
+  Napi::Value AddListFile(const Napi::CallbackInfo& info);
+  
+  // Patch archive operations
+  Napi::Value OpenPatchArchive(const Napi::CallbackInfo& info);
+  Napi::Value IsPatchedArchive(const Napi::CallbackInfo& info);
+  
+  // File finding operations
+  Napi::Value FindFirstFile(const Napi::CallbackInfo& info);
+  Napi::Value EnumLocales(const Napi::CallbackInfo& info);
+  
+  // Advanced file creation
+  Napi::Value CreateFile(const Napi::CallbackInfo& info);
+  Napi::Value AddWave(const Napi::CallbackInfo& info);
+  Napi::Value UpdateFileAttributes(const Napi::CallbackInfo& info);
+  
+  // Get file info
+  Napi::Value GetFileInfo(const Napi::CallbackInfo& info);
 
   // Static locale methods
   static Napi::Value GetLocale(const Napi::CallbackInfo& info);

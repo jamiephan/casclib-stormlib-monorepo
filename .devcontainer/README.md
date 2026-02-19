@@ -71,10 +71,3 @@ Edit `.devcontainer/devcontainer.json` to:
 - The container runs as user `node` (UID 1000)
 - If you encounter permission errors, check file ownership
 
-## Benefits
-
-✅ **Consistent environment** - Same setup for all developers  
-✅ **Isolated dependencies** - No conflicts with host system  
-✅ **Pre-configured tools** - All build tools ready to go  
-✅ **Cross-platform** - Works on Windows and Linux  
-✅ **Easy onboarding** - New developers can start immediately
