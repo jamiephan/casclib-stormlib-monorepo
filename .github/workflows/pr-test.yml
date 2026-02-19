@@ -36,4 +36,4 @@ jobs:
         run: pnpm run build
 
       - name: Run Test
-        run: pnpm coverage
+        run: npm --filter @jamiephan/${{ matrix.package }} test:coverage
