@@ -1,16 +1,13 @@
-name: Test & Coverage
+name: PR Test
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  test-coverage:
-    name: Run Tests & Generate Coverage Report
+  test-pr:
+    name: Run Tests on PR
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-      pull-requests: write
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -38,10 +35,5 @@ jobs:
       - name: Build packages
         run: pnpm run build
 
-      - name: Run tests with coverage
-        uses: ArtiomTr/jest-coverage-report-action@v2
-        with:
-          package-manager: pnpm
-          test-script: pnpm exec jest --ci --json --coverage --testLocationInResults --outputFile=report.json
-          working-directory: packages/${{ matrix.package }}
-          custom-title: Coverage Report - ${{ matrix.package }} (${{ matrix.os }})
+      - name: Run Test
+        run: pnpm coverage
