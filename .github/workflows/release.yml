@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v1.0.0)'
+        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v1.0.0 or stormlib/v0.0.0-dev.3)'
         required: true
         type: string
       npm_tag:
@@ -21,8 +21,8 @@ permissions:
   id-token: write  # Required for npm provenance
 
 jobs:
-  create-tag:
-    name: Create and Push Tag
+  validate:
+    name: Validate Tag and Prepare
     runs-on: ubuntu-latest
     # Only allow running on master branch
     if: github.ref == 'refs/heads/master'
@@ -39,15 +39,10 @@ jobs:
           ref: master
           submodules: recursive  # Include third-party submodules
       
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
       - name: Validate tag format
         run: |
           TAG="${{ inputs.tag }}"
-          echo "Creating tag: $TAG"
+          echo "Validating tag: $TAG"
           
           # Validate tag format (casclib/v* or stormlib/v*)
           if [[ ! "$TAG" =~ ^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
@@ -105,68 +100,21 @@ jobs:
           echo "Package: $PACKAGE"
           echo "Version: $VERSION"
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      
-      - name: Update package.json version
-        run: |
-          PACKAGE="${{ steps.parse.outputs.package }}"
-          VERSION="${{ steps.parse.outputs.version }}"
-          PACKAGE_JSON="packages/$PACKAGE/package.json"
-          
-          echo "Updating $PACKAGE_JSON to version $VERSION"
-          
-          # Update version in package.json using node
-          node -e "
-            const fs = require('fs');
-            const path = '$PACKAGE_JSON';
-            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-            pkg.version = '$VERSION';
-            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-          "
-          
-          echo "✓ Updated package.json version to $VERSION"
-      
-      - name: Commit version bump
-        run: |
-          PACKAGE="${{ steps.parse.outputs.package }}"
-          VERSION="${{ steps.parse.outputs.version }}"
-          
-          git add "packages/$PACKAGE/package.json"
-          git commit -m "chore: [AUTOMATION] Bump $PACKAGE to v$VERSION"
-          
-          echo "✓ Committed version bump"
-      
-      - name: Push commit to master
-        run: |
-          git push origin master
-          echo "✓ Pushed commit to master"
-      
-      - name: Create and push tag
-        run: |
-          TAG="${{ inputs.tag }}"
-          git tag "$TAG"
-          git push origin "$TAG"
-          echo "✓ Successfully created and pushed tag: $TAG"
-      
       - name: Summary
         run: |
           TAG="${{ inputs.tag }}"
           NPM_TAG="${{ inputs.npm_tag }}"
-          echo "### ✓ Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "### ✓ Validation Passed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
           echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The tag has been pushed and package build will now begin." >> $GITHUB_STEP_SUMMARY
+          echo "Package build will now begin. Tag will be created after successful npm publish." >> $GITHUB_STEP_SUMMARY
 
   # Build prebuilds for all platforms and Node versions
   build:
     name: Build ${{ matrix.os }} - Node ${{ matrix.node }}
-    needs: create-tag
+    needs: validate
     strategy:
       matrix:
         include:
@@ -183,7 +131,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: master  # Use master after tag is created
+          ref: master
           submodules: recursive
 
       - name: Setup Node.js ${{ matrix.node }}
@@ -197,19 +145,38 @@ jobs:
         with:
           version: 8
 
+      - name: Update package.json version (temporary)
+        run: |
+          PACKAGE="${{ needs.validate.outputs.package }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          PACKAGE_JSON="packages/$PACKAGE/package.json"
+          
+          echo "Temporarily updating $PACKAGE_JSON to version $VERSION for build"
+          
+          # Update version in package.json using node
+          node -e "
+            const fs = require('fs');
+            const path = '$PACKAGE_JSON';
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          echo "✓ Updated package.json version to $VERSION (not committed)"
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Build TypeScript
-        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
         run: pnpm run build
 
       - name: Create prebuild
-        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
         run: pnpm run prebuild
 
       - name: Run tests
-        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
         run: pnpm test
         env:
           CI: true
@@ -218,13 +185,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prebuilds-${{ runner.os }}-${{ matrix.arch }}-node${{ matrix.node }}
-          path: packages/${{ needs.create-tag.outputs.package }}/prebuilds/**/*
+          path: packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
           retention-days: 7
 
   # Publish to npm with all prebuilds
   publish:
-    name: Publish to npm
-    needs: [create-tag, build]
+    name: Publish to npm and Create Tag
+    needs: [validate, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -234,8 +201,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: master  # Use master after tag is created
+          ref: master
+          fetch-depth: 0  # Fetch all history for proper tagging
           submodules: recursive
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -248,11 +221,30 @@ jobs:
         with:
           version: 8
 
+      - name: Update package.json version
+        run: |
+          PACKAGE="${{ needs.validate.outputs.package }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          PACKAGE_JSON="packages/$PACKAGE/package.json"
+          
+          echo "Updating $PACKAGE_JSON to version $VERSION"
+          
+          # Update version in package.json using node
+          node -e "
+            const fs = require('fs');
+            const path = '$PACKAGE_JSON';
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          echo "✓ Updated package.json version to $VERSION"
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Build TypeScript
-        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
         run: pnpm run build
 
       - name: Download all prebuilds
@@ -263,46 +255,69 @@ jobs:
 
       - name: Organize prebuilds
         run: |
-          mkdir -p packages/${{ needs.create-tag.outputs.package }}/prebuilds
+          mkdir -p packages/${{ needs.validate.outputs.package }}/prebuilds
           
           # Copy all prebuilds to the package directory
           for artifact in artifacts/prebuilds-*; do
             if [ -d "$artifact" ]; then
               echo "Processing $artifact"
-              cp -r "$artifact"/* packages/${{ needs.create-tag.outputs.package }}/prebuilds/ || true
+              cp -r "$artifact"/* packages/${{ needs.validate.outputs.package }}/prebuilds/ || true
             fi
           done
           
           # List all prebuilds
           echo "Available prebuilds:"
-          find packages/${{ needs.create-tag.outputs.package }}/prebuilds -name "*.node" -o -name "*.json"
+          find packages/${{ needs.validate.outputs.package }}/prebuilds -name "*.node" -o -name "*.json"
 
       - name: Update npm
         run: npm install -g npm@latest
         
       - name: Publish to npm
-        working-directory: packages/${{ needs.create-tag.outputs.package }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
         run: npm publish --provenance --access public --tag ${{ inputs.npm_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit version bump
+        run: |
+          PACKAGE="${{ needs.validate.outputs.package }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          git add "packages/$PACKAGE/package.json"
+          git commit -m "chore: [AUTOMATION] Bump $PACKAGE to v$VERSION"
+          
+          echo "✓ Committed version bump"
+      
+      - name: Create tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          git tag "$TAG"
+          echo "✓ Created tag: $TAG"
+      
+      - name: Push commit and tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          git push origin master
+          git push origin "$TAG"
+          echo "✓ Successfully pushed commit and tag: $TAG"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ inputs.tag }}
-          name: '@jamiephan/${{ needs.create-tag.outputs.package }} v${{ needs.create-tag.outputs.version }}'
+          name: '@jamiephan/${{ needs.validate.outputs.package }} v${{ needs.validate.outputs.version }}'
           draft: false
-          prerelease: ${{ needs.create-tag.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
           body: |            
-            ${{ needs.create-tag.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
+            ${{ needs.validate.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
 
             ## Installation
             ```bash
-            npm install @jamiephan/${{ needs.create-tag.outputs.package }}@${{ needs.create-tag.outputs.version }}
+            npm install @jamiephan/${{ needs.validate.outputs.package }}@${{ needs.validate.outputs.version }}
             ```
             
-            ${{ needs.create-tag.outputs.is_prerelease == 'true' && format('Or install with the npm tag: `npm install @jamiephan/{0}@{1}`', needs.create-tag.outputs.package, inputs.npm_tag) || '' }}
+            ${{ needs.validate.outputs.is_prerelease == 'true' && format('Or install with the npm tag: `npm install @jamiephan/{0}@{1}`', needs.validate.outputs.package, inputs.npm_tag) || '' }}
 
             ## Supported Platforms
             This release includes prebuilt N-API binaries for:
@@ -312,20 +327,37 @@ jobs:
             If your platform is not listed, the package will build from source automatically.
 
             ## Documentation
-            For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.create-tag.outputs.package }}/README.md).
+            For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.validate.outputs.package }}/README.md).
 
           # files: |
-          #   packages/${{ needs.create-tag.outputs.package }}/prebuilds/**/*
+          #   packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${{ needs.validate.outputs.version }}"
+          NPM_TAG="${{ inputs.npm_tag }}"
+          echo "### ✅ Release Completed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`@jamiephan/${{ needs.validate.outputs.package }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Git Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✓ Published to npm" >> $GITHUB_STEP_SUMMARY
+          echo "✓ Version bump committed and pushed" >> $GITHUB_STEP_SUMMARY
+          echo "✓ Git tag created and pushed" >> $GITHUB_STEP_SUMMARY
+          echo "✓ GitHub release created" >> $GITHUB_STEP_SUMMARY
 
       - name: Comment on related PRs
         if: success()
         uses: actions/github-script@v7
         with:
           script: |
-            const package = '${{ needs.create-tag.outputs.package }}';
-            const version = '${{ needs.create-tag.outputs.version }}';
+            const package = '${{ needs.validate.outputs.package }}';
+            const version = '${{ needs.validate.outputs.version }}';
             const tag = '${{ inputs.tag }}';
             
             // Find recent merged PRs (last 10)
