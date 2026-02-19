@@ -283,9 +283,6 @@ jobs:
       - name: Publish to npm
         working-directory: packages/${{ needs.validate.outputs.package }}
         run: npm publish --provenance --access public --tag ${{ inputs.npm_tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Commit version bump
         shell: bash
         run: |
