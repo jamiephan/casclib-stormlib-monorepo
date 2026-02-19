@@ -15,7 +15,7 @@
     "test": "pnpm -r --stream test",
     "clean": "pnpm -r --stream clean",
     "rebuild": "pnpm -r --stream rebuild",
-    "coverage": "pnpm -r --stream test:coverage"
+    "test:coverage": "pnpm -r --stream test:coverage"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
