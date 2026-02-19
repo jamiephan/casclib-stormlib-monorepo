@@ -1,6 +1,6 @@
 {
   "name": "@jamiephan/casclib",
-  "version": "0.0.0-dev.4",
+  "version": "0.0.0-dev.5",
   "description": "Node.js native bindings for CascLib - A library to read CASC storage from Blizzard games",
   "repository": {
     "type": "git",
