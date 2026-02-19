@@ -35,101 +35,83 @@ beforeAll(() => {
 });
 
 describe("Archive.create() and Archive.close()", () => {
-  const testDir = getTestDir("create-close");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should create a new archive successfully", () => {
+    const testDir = getTestDir("create-new");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     expect(() => {
       archive.create(archivePath, { maxFileCount: 100 });
     }).not.toThrow();
     expect(fs.existsSync(archivePath)).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should close an archive successfully", () => {
+    const testDir = getTestDir("close-archive");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const result = archive.close();
     expect(result).toBe(true);
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.flush()", () => {
-  const testDir = getTestDir("flush");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should flush archive changes to disk", () => {
+    const testDir = getTestDir("flush-archive");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const result = archive.flush();
     expect(result).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.compact()", () => {
-  const testDir = getTestDir("compact");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should compact archive successfully", () => {
+    const testDir = getTestDir("compact-archive");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const result = archive.compact();
     expect(result).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.addFile() and Archive.extractFile()", () => {
-  const testDir = getTestDir("add-extract");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-  const extractedFile = path.join(testDir, "extracted.txt");
   const testContent = "Hello, StormLib!";
 
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, testContent);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should add a file to the archive", () => {
+    const testDir = getTestDir("add-file");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const result = archive.addFile(sourceFile, "test.txt");
     expect(result).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should extract a file from the archive", () => {
+    const testDir = getTestDir("extract-file");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    const extractedFile = path.join(testDir, "extracted.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -142,18 +124,31 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(fs.existsSync(extractedFile)).toBe(true);
     expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should add a file to a subfolder in the archive", () => {
+    const testDir = getTestDir("add-subfolder");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const result = archive.addFile(sourceFile, "mods/a/b/test.txt");
     expect(result).toBe(true);
     expect(archive.hasFile("mods/a/b/test.txt")).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should extract a file from a subfolder in the archive", () => {
+    const testDir = getTestDir("extract-subfolder");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    const extractedFile = path.join(testDir, "extracted.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "mods/a/b/test.txt");
@@ -166,24 +161,17 @@ describe("Archive.addFile() and Archive.extractFile()", () => {
     expect(fs.existsSync(extractedFile)).toBe(true);
     expect(fs.readFileSync(extractedFile, "utf-8")).toBe(testContent);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.removeFile()", () => {
-  const testDir = getTestDir("remove");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, "Test content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should remove a file from the archive", () => {
+    const testDir = getTestDir("remove-file");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -193,9 +181,15 @@ describe("Archive.removeFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("test.txt")).toBe(false);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should remove a file from a subfolder in the archive", () => {
+    const testDir = getTestDir("remove-subfolder");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "mods/a/b/test.txt");
@@ -205,24 +199,17 @@ describe("Archive.removeFile()", () => {
     expect(result).toBe(true);
     expect(archive.hasFile("mods/a/b/test.txt")).toBe(false);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.renameFile()", () => {
-  const testDir = getTestDir("rename");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, "Test content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should rename a file in the archive", () => {
+    const testDir = getTestDir("rename-file");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "old.txt");
@@ -233,9 +220,15 @@ describe("Archive.renameFile()", () => {
     expect(archive.hasFile("old.txt")).toBe(false);
     expect(archive.hasFile("new.txt")).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should rename a file in a subfolder", () => {
+    const testDir = getTestDir("rename-subfolder");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "mods/a/b/old.txt");
@@ -246,76 +239,60 @@ describe("Archive.renameFile()", () => {
     expect(archive.hasFile("mods/a/b/old.txt")).toBe(false);
     expect(archive.hasFile("mods/a/b/new.txt")).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.getMaxFileCount() and Archive.setMaxFileCount()", () => {
-  const testDir = getTestDir("maxfilecount");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get the maximum file count", () => {
+    const testDir = getTestDir("get-maxfilecount");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath, { maxFileCount: 200 });
     const maxCount = archive.getMaxFileCount();
     expect(typeof maxCount).toBe("number");
     expect(maxCount).toBeGreaterThan(0);
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should set the maximum file count", () => {
+    const testDir = getTestDir("set-maxfilecount");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath, { maxFileCount: 100 });
     const result = archive.setMaxFileCount(500);
     expect(result).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.getAttributes()", () => {
-  const testDir = getTestDir("attributes");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get archive attributes", () => {
+    const testDir = getTestDir("get-attributes");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     const attributes = archive.getAttributes();
     expect(typeof attributes).toBe("number");
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.read()", () => {
-  const testDir = getTestDir("file-read");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
   const testContent = "Hello, this is test content for reading!";
 
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, testContent);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should read data from a file", () => {
+    const testDir = getTestDir("file-read");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -328,25 +305,19 @@ describe("File.read()", () => {
     expect(data.length).toBeGreaterThan(0);
     file.close();
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.readAll()", () => {
-  const testDir = getTestDir("file-readall");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
   const testContent = "Complete file content to read all at once!";
 
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, testContent);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should read all data from a file", () => {
+    const testDir = getTestDir("file-readall");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -359,9 +330,15 @@ describe("File.readAll()", () => {
     expect(data.toString()).toBe(testContent);
     file.close();
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should read all data from a file in a subfolder", () => {
+    const testDir = getTestDir("file-readall-subfolder");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "mods/a/b/test.txt");
@@ -374,25 +351,19 @@ describe("File.readAll()", () => {
     expect(data.toString()).toBe(testContent);
     file.close();
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.getSize()", () => {
-  const testDir = getTestDir("file-size");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
   const testContent = "Content with known size";
 
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, testContent);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get the file size", () => {
+    const testDir = getTestDir("file-getsize");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, testContent);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -405,24 +376,17 @@ describe("File.getSize()", () => {
     expect(size).toBe(testContent.length);
     file.close();
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.close()", () => {
-  const testDir = getTestDir("file-close");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, "Test content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should close a file successfully", () => {
+    const testDir = getTestDir("file-close");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -433,6 +397,7 @@ describe("File.close()", () => {
     const result = file.close();
     expect(result).toBe(true);
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
@@ -492,29 +457,20 @@ describe("File.getPosition() and File.setPosition() - TODO", () => {
 });
 
 describe("Archive.listFiles()", () => {
-  const testDir = getTestDir("listfiles");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile1 = path.join(testDir, "file1.txt");
-  const sourceFile2 = path.join(testDir, "file2.txt");
-
-  beforeEach(() => {
+  it("should list all files in the archive", () => {
+    const testDir = getTestDir("listfiles-all");
     ensureDir(testDir);
+    const sourceFile1 = path.join(testDir, "file1.txt");
+    const sourceFile2 = path.join(testDir, "file2.txt");
     createTestFile(sourceFile1, "Content 1");
     createTestFile(sourceFile2, "Content 2");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
-  it("should list all files in the archive", () => {
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile1, "file1.txt");
     archive.addFile(sourceFile2, "file2.txt");
     
     const files = archive.listFiles();
-    console.log(files)
     expect(Array.isArray(files)).toBe(true);
     expect(files.length).toBeGreaterThanOrEqual(2);
     
@@ -523,9 +479,17 @@ describe("Archive.listFiles()", () => {
     expect(fileNames).toContain("file2.txt");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should list files in subfolders", () => {
+    const testDir = getTestDir("listfiles-subfolders");
+    ensureDir(testDir);
+    const sourceFile1 = path.join(testDir, "file1.txt");
+    const sourceFile2 = path.join(testDir, "file2.txt");
+    createTestFile(sourceFile1, "Content 1");
+    createTestFile(sourceFile2, "Content 2");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile1, "mods/a/file1.txt");
@@ -540,9 +504,15 @@ describe("Archive.listFiles()", () => {
     expect(fileNames).toContain("mods/b/file2.txt");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should return file info with correct properties", () => {
+    const testDir = getTestDir("listfiles-props");
+    ensureDir(testDir);
+    const sourceFile1 = path.join(testDir, "file1.txt");
+    createTestFile(sourceFile1, "Content 1");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile1, "file1.txt");
@@ -558,26 +528,19 @@ describe("Archive.listFiles()", () => {
     expect(typeof file?.locale).toBe("number");
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.findFiles()", () => {
-  const testDir = getTestDir("findfiles");
-  const archivePath = path.join(testDir, "test.mpq");
-  const txtFile = path.join(testDir, "test.txt");
-  const luaFile = path.join(testDir, "test.lua");
-
-  beforeEach(() => {
+  it("should find files matching a pattern", () => {
+    const testDir = getTestDir("findfiles-pattern");
     ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    const luaFile = path.join(testDir, "test.lua");
     createTestFile(txtFile, "TXT content");
     createTestFile(luaFile, "LUA content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
-  it("should find files matching a pattern", () => {
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -591,9 +554,17 @@ describe("Archive.findFiles()", () => {
     expect(hasTxt).toBe(true);
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should find all files with wildcard", () => {
+    const testDir = getTestDir("findfiles-wildcard");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    const luaFile = path.join(testDir, "test.lua");
+    createTestFile(txtFile, "TXT content");
+    createTestFile(luaFile, "LUA content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -604,9 +575,17 @@ describe("Archive.findFiles()", () => {
     expect(allFiles!.length).toBeGreaterThanOrEqual(2);
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should find files in subfolders with patterns", () => {
+    const testDir = getTestDir("findfiles-subfolders");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    const luaFile = path.join(testDir, "test.lua");
+    createTestFile(txtFile, "TXT content");
+    createTestFile(luaFile, "LUA content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "mods/a/b/test.txt");
@@ -623,22 +602,15 @@ describe("Archive.findFiles()", () => {
     expect(fileNames).toContain("mods/c/other.txt");
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.isPatchedArchive()", () => {
-  const testDir = getTestDir("patched");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should return false for non-patched archive", () => {
+    const testDir = getTestDir("is-patched");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     
@@ -647,24 +619,17 @@ describe("Archive.isPatchedArchive()", () => {
     expect(isPatched).toBe(false);
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.getFileChecksums()", () => {
-  const testDir = getTestDir("checksums");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, "Test content for checksums");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get file checksums", () => {
+    const testDir = getTestDir("get-checksums");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content for checksums");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -680,23 +645,17 @@ describe("Archive.getFileChecksums()", () => {
     }
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.write() and File.finish()", () => {
-  const testDir = getTestDir("file-write");
-  const archivePath = path.join(testDir, "test.mpq");
   const testContent = "Written content";
 
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should write data to a file and finish", () => {
+    const testDir = getTestDir("file-write");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     
@@ -716,24 +675,17 @@ describe("File.write() and File.finish()", () => {
     readFile.close();
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("File.getFileName()", () => {
-  const testDir = getTestDir("file-getname");
-  const archivePath = path.join(testDir, "test.mpq");
-  const sourceFile = path.join(testDir, "source.txt");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(sourceFile, "Test content");
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should get the file name", () => {
+    const testDir = getTestDir("file-getfilename");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "Test content");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(sourceFile, "test.txt");
@@ -746,22 +698,15 @@ describe("File.getFileName()", () => {
     expect(fileName).toContain("test.txt");
     file.close();
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.verifyArchive()", () => {
-  const testDir = getTestDir("verify-archive");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should verify archive signature", () => {
+    const testDir = getTestDir("verify-archive");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     
@@ -771,22 +716,15 @@ describe("Archive.verifyArchive()", () => {
     expect(result).toBeGreaterThanOrEqual(0);
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive.signArchive()", () => {
-  const testDir = getTestDir("sign-archive");
-  const archivePath = path.join(testDir, "test.mpq");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should sign archive", () => {
+    const testDir = getTestDir("sign-archive");
+    ensureDir(testDir);
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     
@@ -799,27 +737,17 @@ describe("Archive.signArchive()", () => {
     }
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
 
 describe("Archive utility methods", () => {
-  const testDir = getTestDir("utils");
-  const archivePath = path.join(testDir, "test.mpq");
-  const txtFile = path.join(testDir, "test.txt");
-  const jsonFile = path.join(testDir, "test.json");
-
-  beforeEach(() => {
-    ensureDir(testDir);
-    createTestFile(txtFile, "Hello, World!");
-    createTestFile(jsonFile, JSON.stringify({ version: "1.0", name: "test" }));
-  });
-
-  afterEach(() => {
-    cleanupDir(testDir);
-  });
-
   it("should read file as string", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("read-string");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    createTestFile(txtFile, "Hello, World!");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -829,10 +757,15 @@ describe("Archive utility methods", () => {
     expect(content).toBe("Hello, World!");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should read file as JSON", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("read-json");
+    ensureDir(testDir);
+    const jsonFile = path.join(testDir, "test.json");
+    createTestFile(jsonFile, JSON.stringify({ version: "1.0", name: "test" }));
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(jsonFile, "test.json");
@@ -843,10 +776,17 @@ describe("Archive utility methods", () => {
     expect(json.name).toBe("test");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should get file names", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("get-filenames");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    const jsonFile = path.join(testDir, "test.json");
+    createTestFile(txtFile, "Hello, World!");
+    createTestFile(jsonFile, JSON.stringify({ version: "1.0", name: "test" }));
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -858,10 +798,15 @@ describe("Archive utility methods", () => {
     expect(names).toContain("test.json");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should check if file can be opened", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("can-open-file");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    createTestFile(txtFile, "Hello, World!");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -873,10 +818,15 @@ describe("Archive utility methods", () => {
     expect(cannotOpen).toBe(false);
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should get total size", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("get-total-size");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    createTestFile(txtFile, "Hello, World!");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -886,10 +836,15 @@ describe("Archive utility methods", () => {
     expect(totalSize).toBeGreaterThan(0);
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should get compression ratio", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("get-compression-ratio");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    createTestFile(txtFile, "Hello, World!");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "test.txt");
@@ -900,10 +855,15 @@ describe("Archive utility methods", () => {
     // Note: Compression ratio can be > 1 for small files where compression overhead exceeds savings
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should read file as string from subfolder", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("read-string-subfolder");
+    ensureDir(testDir);
+    const txtFile = path.join(testDir, "test.txt");
+    createTestFile(txtFile, "Hello, World!");
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(txtFile, "mods/a/b/test.txt");
@@ -913,10 +873,15 @@ describe("Archive utility methods", () => {
     expect(content).toBe("Hello, World!");
     
     archive.close();
+    cleanupDir(testDir);
   });
 
   it("should read file as JSON from subfolder", () => {
-    const { Archive } = require("../lib");
+    const testDir = getTestDir("read-json-subfolder");
+    ensureDir(testDir);
+    const jsonFile = path.join(testDir, "test.json");
+    createTestFile(jsonFile, JSON.stringify({ version: "1.0", name: "test" }));
+    const archivePath = path.join(testDir, "test.mpq");
     const archive = new Archive();
     archive.create(archivePath);
     archive.addFile(jsonFile, "data/config/test.json");
@@ -927,5 +892,6 @@ describe("Archive utility methods", () => {
     expect(json.name).toBe("test");
     
     archive.close();
+    cleanupDir(testDir);
   });
 });
