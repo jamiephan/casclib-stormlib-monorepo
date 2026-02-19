@@ -67,3 +67,6 @@ test-data/
 *.casc
 
 .pnpm-store
+
+# Jest coverage report
+packages/*/report.json 

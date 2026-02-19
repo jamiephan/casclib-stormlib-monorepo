@@ -1,0 +1,150 @@
+name: Create and Push Git Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v1.0.0)'
+        required: true
+        type: string
+      npm_tag:
+        description: 'NPM distribution tag'
+        required: true
+        type: choice
+        options:
+          - latest
+          - dev
+        default: latest
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create and Push Tag
+    runs-on: ubuntu-latest
+    # Only allow running on master branch
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper tagging
+          ref: master
+          submodules: recursive  # Include third-party submodules
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Validate tag format
+        run: |
+          TAG="${{ inputs.tag }}"
+          echo "Creating tag: $TAG"
+          
+          # Validate tag format (casclib/v* or stormlib/v*)
+          if [[ ! "$TAG" =~ ^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "Error: Tag must be in format 'casclib/vX.Y.Z' or 'stormlib/vX.Y.Z'"
+            echo "Examples: casclib/v1.0.0, stormlib/v2.1.0-beta.1"
+            exit 1
+          fi
+          
+          echo "Tag format validation passed"
+      
+      - name: Check if tag already exists
+        run: |
+          TAG="${{ inputs.tag }}"
+          
+          echo "Checking if tag $TAG already exists..."
+          
+          # Fetch all tags from remote
+          git fetch --tags
+          
+          # Check if tag exists locally or remotely
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "❌ Error: Tag $TAG already exists locally"
+            exit 1
+          fi
+          
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "❌ Error: Tag $TAG already exists on remote"
+            exit 1
+          fi
+          
+          echo "✓ Tag $TAG does not exist, safe to create"
+      
+      - name: Parse tag components
+        id: parse
+        run: |
+          TAG="${{ inputs.tag }}"
+          
+          # Extract package name (casclib or stormlib)
+          PACKAGE=$(echo "$TAG" | cut -d'/' -f1)
+          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
+          
+          # Extract version (remove 'v' prefix)
+          VERSION=$(echo "$TAG" | cut -d'/' -f2 | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          echo "Package: $PACKAGE"
+          echo "Version: $VERSION"
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Update package.json version
+        run: |
+          PACKAGE="${{ steps.parse.outputs.package }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          PACKAGE_JSON="packages/$PACKAGE/package.json"
+          
+          echo "Updating $PACKAGE_JSON to version $VERSION"
+          
+          # Update version in package.json using node
+          node -e "
+            const fs = require('fs');
+            const path = '$PACKAGE_JSON';
+            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          "
+          
+          echo "✓ Updated package.json version to $VERSION"
+      
+      - name: Commit version bump
+        run: |
+          PACKAGE="${{ steps.parse.outputs.package }}"
+          VERSION="${{ steps.parse.outputs.version }}"
+          
+          git add "packages/$PACKAGE/package.json"
+          git commit -m "chore: [AUTOMATION] Bump $PACKAGE to v$VERSION"
+          
+          echo "✓ Committed version bump"
+      
+      - name: Push commit to master
+        run: |
+          git push origin master
+          echo "✓ Pushed commit to master"
+      
+      - name: Create and push tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "✓ Successfully created and pushed tag: $TAG"
+      
+      - name: Summary
+        run: |
+          TAG="${{ inputs.tag }}"
+          NPM_TAG="${{ inputs.npm_tag }}"
+          echo "### ✓ Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The tag has been pushed to the repository and will trigger the publish workflow." >> $GITHUB_STEP_SUMMARY
