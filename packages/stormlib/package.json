@@ -22,7 +22,7 @@
     "prebuild": "prebuildify --napi --strip",
     "clean": "node-gyp clean && rimraf dist",
     "test": "jest",
-    "test:coverage": "jest --ci --json --coverage --testLocationInResults --outputFile=report.json",
+    "test:coverage": "jest --coverage",
     "prepublishOnly": "pnpm rebuild"
   },
   "keywords": [

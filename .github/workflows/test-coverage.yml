@@ -42,7 +42,7 @@ jobs:
         uses: ArtiomTr/jest-coverage-report-action@v2
         with:
           package-manager: pnpm
-          test-script: pnpm --filter @jamiephan/${{ matrix.package }} test:coverage
+          test-script: pnpm exec jest --ci --json --coverage --testLocationInResults --outputFile=report.json
           annotations: coverage
-          coverage-file: packages/${{ matrix.package }}/report.json
+          working-directory: packages/${{ matrix.package }}
           custom-title: Coverage Report - ${{ matrix.package }} (${{ matrix.os }})
