@@ -4,13 +4,13 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 
 ## Features
 
-- ✅ Read CASC storage archives (local and online)
-- ✅ Extract files from modern Blizzard games
-- ✅ TypeScript support with full type definitions
-- ✅ Cross-platform (Windows, macOS, Linux)
-- ✅ Both CommonJS and ES Module support
-- ✅ High-level wrapper API for ease of use
-- ✅ Low-level bindings for advanced usage
+- Read CASC storage archives (local and online)
+- Extract files from modern Blizzard games
+- TypeScript support with full type definitions
+- Cross-platform (Windows, macOS, Linux)
+- Both CommonJS and ES Module support
+- High-level wrapper API for ease of use
+- Low-level bindings for advanced usage
 
 ## Supported Games
 

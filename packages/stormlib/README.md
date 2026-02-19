@@ -4,15 +4,15 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 
 ## Features
 
-- ✅ Read and write MPQ archives
-- ✅ Extract files from classic Blizzard games
-- ✅ Create new archives and modify existing ones
-- ✅ File compression and encryption support
-- ✅ TypeScript support with full type definitions
-- ✅ Cross-platform (Windows, macOS, Linux)
-- ✅ Both CommonJS and ES Module support
-- ✅ High-level wrapper API for ease of use
-- ✅ Low-level bindings for advanced usage
+- Read and write MPQ archives
+- Extract files from classic Blizzard games
+- Create new archives and modify existing ones
+- File compression and encryption support
+- TypeScript support with full type definitions
+- Cross-platform (Windows, macOS, Linux)
+- Both CommonJS and ES Module support
+- High-level wrapper API for ease of use
+- Low-level bindings for advanced usage
 
 ## Supported Games
 
