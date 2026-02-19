@@ -44,7 +44,5 @@ jobs:
           package-manager: pnpm
           test-script: pnpm --filter @jamiephan/${{ matrix.package }} test:coverage
           annotations: coverage
-          skip-step: install
-          coverage-file: packages/${{ matrix.package }}/coverage/coverage-summary.json
-          base-coverage-file: packages/${{ matrix.package }}/coverage/coverage-summary.json
+          coverage-file: packages/${{ matrix.package }}/report.json
           custom-title: Coverage Report - ${{ matrix.package }} (${{ matrix.os }})
