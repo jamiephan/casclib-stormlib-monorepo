@@ -7,7 +7,7 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 - ✅ Read CASC storage archives (local and online)
 - ✅ Extract files from modern Blizzard games
 - ✅ TypeScript support with full type definitions
-- ✅ Cross-platform (Windows, macOS, Linux)
+- ✅ Cross-platform (Windows, Linux)
 - ✅ Both CommonJS and ES Module support
 - ✅ High-level wrapper API for ease of use
 - ✅ Low-level bindings for advanced usage
@@ -113,7 +113,7 @@ const storage = new Storage();
 // Windows - Basic usage with cache folder and product code
 storage.openOnline('C:/Temp/CASC/Cache*hero');
 
-// Linux/macOS - Basic usage
+// Linux - Basic usage
 storage.openOnline('/tmp/casc/cache*hero');
 
 // With CDN server specified
@@ -238,7 +238,7 @@ Opens an online CASC storage.
 - `path`: Connection string in the format: `local_cache_folder[*cdn_server_url]*code_name[*region]`
   - `local_cache_folder`: Local cache directory for downloaded game data (reusable across runs)
     - Windows: `C:/Temp/CASC/Cache`
-    - Linux/macOS: `/tmp/casc/cache`
+    - Linux: `/tmp/casc/cache`
   - `cdn_server_url`: Optional CDN server URL (e.g., `http://us.patch.battle.net:1119`). If omitted, uses default CDN
   - `code_name`: TACT product code - see [TACT documentation](https://wowdev.wiki/TACT) for available codes
     - Examples: `hero` (Heroes of the Storm), `wow` (World of Warcraft), `s2` (StarCraft II), `d3` (Diablo III)
@@ -250,7 +250,7 @@ Opens an online CASC storage.
 // Windows - Minimal format: cache folder and product code
 storage.openOnline('C:/Temp/CASC/Cache*hero');
 
-// Linux/macOS - Minimal format
+// Linux - Minimal format
 storage.openOnline('/tmp/casc/cache*hero');
 
 // With CDN server specified

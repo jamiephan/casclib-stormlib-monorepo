@@ -214,11 +214,10 @@ Pattern: Classes with `open()` need `close()`. Document in method JSDoc.
 
 ## CI/CD Notes
 
-**Multi-platform testing**: [.github/workflows/build.yml](.github/workflows/build.yml) tests on Linux/Windows/macOS × Node 18/20/22
+**Multi-platform testing**: [.github/workflows/build.yml](.github/workflows/build.yml) tests on Linux/Windows × Node 22
 
 **Platform-specific dependencies**:
 - Linux: `build-essential`, `zlib1g-dev`, `libbz2-dev`
-- macOS: `zlib`, `bzip2` (via Homebrew)
 - Windows: Visual Studio build tools (via node-gyp)
 
 **Prebuild binaries**: Uses `prebuildify` to generate prebuilt `.node` files for common platforms (see `npm run prebuild`). Published packages install without compiling on supported platforms.

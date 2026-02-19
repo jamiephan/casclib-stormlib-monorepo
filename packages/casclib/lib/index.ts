@@ -61,7 +61,7 @@ export class Storage {
    * @param path - Connection string in the format: `local_cache_folder[*cdn_server_url]*code_name[*region]`
    *   - `local_cache_folder`: Local cache directory for downloaded game data (reusable)
    *     - Windows: `C:/Temp/CASC/Cache`
-   *     - Linux/macOS: `/tmp/casc/cache`
+   *     - Linux: `/tmp/casc/cache`
    *   - `cdn_server_url`: Optional CDN server URL (e.g., "http://us.patch.battle.net:1119")
    *   - `code_name`: TACT product code (e.g., "hero" for Heroes of the Storm, "wow" for World of Warcraft)
    *     See https://wowdev.wiki/TACT for available product codes
@@ -72,7 +72,7 @@ export class Storage {
    * // Windows - Basic usage with minimal parameters
    * storage.openOnline('C:/Temp/CASC/Cache*hero');
    * 
-   * // Linux/macOS - Basic usage
+   * // Linux - Basic usage
    * storage.openOnline('/tmp/casc/cache*hero');
    * 
    * // With CDN server specified
