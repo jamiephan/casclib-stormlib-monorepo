@@ -339,8 +339,8 @@ jobs:
             ## Documentation
             For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.validate.outputs.package }}/README.md).
 
-          files: |
-            packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
+          # files: |
+          #   packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
