@@ -331,16 +331,16 @@ jobs:
 
             ## Supported Platforms
             This release includes prebuilt N-API binaries for:
-            - **Linux (x64)** - Node.js 22
-            - **Windows (x64)** - Node.js 22
+            - **Linux (x64)**
+            - **Windows (x64)**
 
             If your platform is not listed, the package will build from source automatically.
 
             ## Documentation
             For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.validate.outputs.package }}/README.md).
 
-          # files: |
-          #   packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
+          files: |
+            packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
