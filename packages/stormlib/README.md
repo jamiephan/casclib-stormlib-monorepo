@@ -59,8 +59,8 @@ import { Archive, File } from '@jamiephan/stormlib';
 // CommonJS
 const { Archive, File } = require('@jamiephan/stormlib');
 
-// Advanced: Direct binding access
-import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
+// Advanced: Direct binding access (also from main package)
+import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 ```
 
 ### Opening an MPQ Archive
@@ -188,7 +188,7 @@ processArchive();
 #### Listing All Files in an Archive
 
 ```typescript
-import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 
 const archive = new Archive();
 archive.open('/path/to/game.mpq');
@@ -205,8 +205,8 @@ files.forEach(fileInfo => {
   console.log(`  Locale: ${fileInfo.locale}`);
 });
 
-// Or use utility function
-const fileNames = ArchiveUtils.getFileNames(archive);
+// Get all file names
+const fileNames = archive.getFileNames();
 console.log('Files:', fileNames.join(', '));
 
 archive.close();
@@ -285,10 +285,10 @@ archive.signArchive();
 archive.close();
 ```
 
-#### Using ArchiveUtils for Batch Operations
+#### Batch Operations and Utilities
 
 ```typescript
-import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
+import { Archive } from '@jamiephan/stormlib';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -296,25 +296,21 @@ const archive = new Archive();
 archive.open('/path/to/game.mpq');
 
 // Extract all Lua scripts
-const extracted = ArchiveUtils.extractAllFiles(
-  archive, 
-  '/output/scripts', 
-  '*.lua'
-);
+const extracted = archive.extractAllFiles('/output/scripts', '*.lua');
 console.log(`Extracted ${extracted} Lua files`);
 
 // Read configuration as JSON
 try {
-  const config = ArchiveUtils.readFileAsJson(archive, 'config.json');
+  const config = archive.readFileAsJson('config.json');
   console.log('Configuration:', config);
 } catch (e) {
   console.error('No config.json found');
 }
 
 // Get compression statistics
-const totalSize = ArchiveUtils.getTotalSize(archive);
-const compressedSize = ArchiveUtils.getTotalCompressedSize(archive);
-const ratio = ArchiveUtils.getCompressionRatio(archive);
+const totalSize = archive.getTotalSize();
+const compressedSize = archive.getTotalCompressedSize();
+const ratio = archive.getCompressionRatio();
 
 console.log(`Total size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
 console.log(`Compressed: ${(compressedSize / 1024 / 1024).toFixed(2)} MB`);
@@ -733,7 +729,7 @@ const success = archive.extractFile('war3map.j', '/output/war3map.j');
 ```
 
 ##### `addFile(sourcePath: string, archiveName: string, options?: AddFileOptions): boolean`
-Adds a file to the archive from disk with default compression settings.
+Adds a file to the archive from disk.
 
 **Parameters:**
 - `sourcePath`: Path to the file on disk
@@ -743,13 +739,15 @@ Adds a file to the archive from disk with default compression settings.
   - `compression`: Compression method for first sector
   - `compressionNext`: Compression method for subsequent sectors
 
+**Note:** If `compression` or `compressionNext` are provided in options, this method automatically uses the extended version (`SFileAddFileEx`)
+
 **Returns:** `true` if added successfully
 
 **Example:**
 ```typescript
 import { MPQ_FILE_COMPRESS, MPQ_COMPRESSION_ZLIB } from '@jamiephan/stormlib';
 
-// Simple add with default settings
+// Simple add (calls SFileAddFile internally)
 archive.addFile('/local/file.txt', 'archive-file.txt');
 
 // With specific flags
@@ -757,7 +755,7 @@ archive.addFile('/local/file.txt', 'archive-file.txt', {
   flags: MPQ_FILE_COMPRESS 
 });
 
-// With compression options
+// With compression options (calls SFileAddFileEx internally)
 archive.addFile('/local/file.txt', 'archive-file.txt', {
   flags: MPQ_FILE_COMPRESS,
   compression: MPQ_COMPRESSION_ZLIB,
@@ -973,19 +971,14 @@ Gets file information.
 const info = file.getFileInfo(0);
 ```
 
----
+#### Utility Methods
 
-## Utility Functions
+The Archive class provides several utility methods for common operations:
 
-### ArchiveUtils
-
-The `ArchiveUtils` namespace provides utility functions for common archive operations:
-
-#### `readFileAsString(archive: Archive, filename: string, encoding?: BufferEncoding): string`
+##### `readFileAsString(filename: string, encoding?: BufferEncoding): string`
 Reads a file from the archive as a string.
 
 **Parameters:**
-- `archive`: Archive instance
 - `filename`: Name of the file to read
 - `encoding`: Text encoding (default: 'utf-8')
 
@@ -993,20 +986,17 @@ Reads a file from the archive as a string.
 
 **Example:**
 ```typescript
-import { Archive, ArchiveUtils } from '@jamiephan/stormlib';
-
 const archive = new Archive();
 archive.open('/path/to/archive.mpq');
 
-const content = ArchiveUtils.readFileAsString(archive, 'script.lua');
+const content = archive.readFileAsString('script.lua');
 console.log(content);
 ```
 
-#### `readFileAsJson<T>(archive: Archive, filename: string): T`
+##### `readFileAsJson<T>(filename: string): T`
 Reads a file from the archive and parses it as JSON.
 
 **Parameters:**
-- `archive`: Archive instance
 - `filename`: Name of the JSON file
 
 **Returns:** Parsed JSON object
@@ -1018,15 +1008,14 @@ interface Config {
   settings: Record<string, any>;
 }
 
-const config = ArchiveUtils.readFileAsJson<Config>(archive, 'config.json');
+const config = archive.readFileAsJson<Config>('config.json');
 console.log(`Version: ${config.version}`);
 ```
 
-####` extractAllFiles(archive: Archive, outputDir: string, mask?: string): number`
+##### `extractAllFiles(outputDir: string, mask?: string): number`
 Extracts all files matching a mask to a directory.
 
 **Parameters:**
-- `archive`: Archive instance
 - `outputDir`: Output directory path
 - `mask`: File mask to filter (default: "*")
 
@@ -1034,84 +1023,74 @@ Extracts all files matching a mask to a directory.
 
 **Example:**
 ```typescript
-const extracted = ArchiveUtils.extractAllFiles(archive, '/output/dir');
+const extracted = archive.extractAllFiles('/output/dir');
 console.log(`Extracted ${extracted} files`);
 
 // Extract only .j files
-const jFiles = ArchiveUtils.extractAllFiles(archive, '/output/dir', '*.j');
+const jFiles = archive.extractAllFiles('/output/dir', '*.j');
 ```
 
-#### `getFileNames(archive: Archive, mask?: string): string[]`
+##### `getFileNames(mask?: string): string[]`
 Gets all file names in the archive.
 
 **Parameters:**
-- `archive`: Archive instance
 - `mask`: File mask to filter (default: "*")
 
 **Returns:** Array of file names
 
 **Example:**
 ```typescript
-const allFiles = ArchiveUtils.getFileNames(archive);
-const scripts = ArchiveUtils.getFileNames(archive, '*.lua');
+const allFiles = archive.getFileNames();
+const scripts = archive.getFileNames('*.lua');
 ```
 
-#### `canOpenFile(archive: Archive, filename: string): boolean`
+##### `canOpenFile(filename: string): boolean`
 Checks if a file exists and can be opened.
 
 **Parameters:**
-- `archive`: Archive instance
 - `filename`: Name of the file
 
 **Returns:** `true` if file can be opened
 
 **Example:**
 ```typescript
-if (ArchiveUtils.canOpenFile(archive, 'war3map.j')) {
+if (archive.canOpenFile('war3map.j')) {
   console.log('File is accessible');
 }
 ```
 
-#### `getTotalSize(archive: Archive): number`
-Gets the total uncompressed size of all files.
-
-**Parameters:**
-- `archive`: Archive instance
+##### `getTotalSize(): number`
+Gets the total uncompressed size of all files in the archive.
 
 **Returns:** Total size in bytes
 
 **Example:**
 ```typescript
-const totalSize = ArchiveUtils.getTotalSize(archive);
+const totalSize = archive.getTotalSize();
 console.log(`Total: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
 ```
 
-#### `getTotalCompressedSize(archive: Archive): number`
-Gets the total compressed size of all files.
-
-**Parameters:**
-- `archive`: Archive instance
+##### `getTotalCompressedSize(): number`
+Gets the total compressed size of all files in the archive.
 
 **Returns:** Total compressed size in bytes
 
 **Example:**
 ```typescript
-const compSize = ArchiveUtils.getTotalCompressedSize(archive);
+const compSize = archive.getTotalCompressedSize();
 console.log(`Compressed: ${(compSize / 1024 / 1024).toFixed(2)} MB`);
 ```
 
-#### `getCompressionRatio(archive: Archive): number`
+##### `getCompressionRatio(): number`
 Calculates the compression ratio for the archive.
 
-**Parameters:**
-- `archive`: Archive instance
-
-**Returns:** Compression ratio (0.0 to 1.0)
+**Returns:** Compression ratio (0.0 to 1.0, where 0.5 means 50% of original size)
 
 **Example:**
 ```typescript
-const ratio = ArchiveUtils.getCompressionRatio(archive);
+const ratio = archive.getCompressionRatio();
 console.log(`Compression ratio: ${(ratio * 100).toFixed(1)}%`);
+console.log(`Space saved: ${((1 - ratio) * 100).toFixed(1)}%`);
 ```
 
 ---
@@ -1361,7 +1340,7 @@ archive.create('/path/to/archive.mpq', {
 For advanced users who need direct access to the native bindings:
 
 ```typescript
-import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib/bindings';
+import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 
 const archive: MPQArchive = new MPQArchiveBinding();
 archive.SFileOpenArchive('/path/to/archive.mpq', 0);
