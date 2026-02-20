@@ -56,7 +56,6 @@
   "files": [
     "dist/",
     "prebuilds/",
-    "build/Release/*.node",
     "src/",
     "binding.gyp",
     "README.md"
