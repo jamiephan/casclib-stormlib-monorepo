@@ -58,8 +58,16 @@ import { Storage, File } from '@jamiephan/casclib';
 // CommonJS
 const { Storage, File } = require('@jamiephan/casclib');
 
-// Advanced: Direct binding access
-import { CascStorageBinding, CascStorage, CascFile } from '@jamiephan/casclib/bindings';
+// Advanced: Direct binding access (low-level API)
+import { CascStorageBinding, CascStorage, CascFile } from '@jamiephan/casclib';
+
+// Import constants and enums
+import { 
+  CASC_OPEN_BY_NAME, 
+  CASC_LOCALE_ENUS, 
+  CascStorageInfoClass,
+  CascFileInfoClass 
+} from '@jamiephan/casclib';
 ```
 
 ### Opening a CASC Storage
@@ -231,6 +239,31 @@ storage.open('/path/to/heroes/HeroesData');
 storage.open('/path/to/heroes/HeroesData', { flags: 0 });
 ```
 
+##### `openEx(params: string, options?: CascOpenStorageExOptions): void`
+Opens a CASC storage with extended parameters.
+
+**Parameters:**
+- `params`: Path or parameter string
+- `options`: Extended opening options
+  - `localPath`: Local path to storage
+  - `codeName`: Product code name
+  - `region`: Server region
+  - `localeMask`: Locale mask for filtering files
+  - `flags`: Opening flags
+  - `buildKey`: Specific build key
+  - `cdnHostUrl`: CDN host URL
+  - `online`: Whether to use online mode
+
+**Example:**
+```typescript
+storage.openEx('/path/to/storage', {
+  localPath: '/path/to/storage',
+  codeName: 'hero',
+  region: 'us',
+  flags: 0
+});
+```
+
 ##### `openOnline(path: string, options?: StorageOpenOptions): void`
 Opens an online CASC storage.
 
@@ -275,7 +308,7 @@ Closes the storage and releases resources.
 const closed = storage.close();
 ```
 
-##### `getStorageInfo(infoClass: number): StorageInfo`
+##### `getStorageInfo(infoClass: number): CascStorageInfo`
 Gets storage information.
 
 **Parameters:**
@@ -341,7 +374,7 @@ if (info) {
 
 #### File Finding
 
-##### `findFirstFile(mask?: string, listFile?: string): FindData | null`
+##### `findFirstFile(mask?: string, listFile?: string): CascFindData | null`
 Finds the first file matching the mask.
 
 **Parameters:**
@@ -358,7 +391,7 @@ if (findData) {
 }
 ```
 
-##### `findNextFile(): FindData | null`
+##### `findNextFile(): CascFindData | null`
 Finds the next file in the search.
 
 **Returns:** Find data object or `null` if no more files
@@ -512,7 +545,7 @@ Gets the file size in bytes (64-bit).
 const size = file.getSize64();
 ```
 
-##### `getFileInfo(infoClass: number): FileInfoResult`
+##### `getFileInfo(infoClass: number): CascFileInfoResult`
 Gets detailed file information.
 
 **Parameters:**
@@ -599,48 +632,200 @@ interface FileOpenOptions {
   flags?: number;
 }
 
+interface CascOpenStorageExOptions {
+  localPath?: string;
+  codeName?: string;
+  region?: string;
+  localeMask?: number;
+  flags?: number;
+  buildKey?: string;
+  cdnHostUrl?: string;
+  online?: boolean;
+}
+
 interface FileInfo {
   name: string;
   size: number;
 }
 
-interface FindData {
+interface CascFindData {
   fileName: string;
+  ckey: Buffer;
+  ekey: Buffer;
+  tagBitMask: number;
   fileSize: number;
-  localeFlags: number;
+  plainName: string | null;
   fileDataId: number;
+  localeFlags: number;
   contentFlags: number;
-  // ... additional fields
+  spanCount: number;
+  available: boolean;
+  nameType: CascNameType;
 }
 
-interface StorageInfo {
-  // Storage-specific information
+interface CascStorageInfo {
+  fileCount?: number;
+  features?: number;
+  codeName?: string;
+  buildNumber?: number;
 }
 
-interface FileInfoResult {
-  // File-specific information
+interface CascFileInfoResult {
+  ckey?: Buffer;
+  ekey?: Buffer;
+  dataFileName?: string;
+  storageOffset?: number;
+  segmentOffset?: number;
+  tagBitMask?: number;
+  fileNameHash?: number;
+  contentSize?: number;
+  encodedSize?: number;
+  segmentIndex?: number;
+  spanCount?: number;
+  fileDataId?: number;
+  localeFlags?: number;
+  contentFlags?: number;
 }
 ```
+
+## Enums
+
+```typescript
+enum CascStorageInfoClass {
+  LocalFileCount = 0,
+  TotalFileCount = 1,
+  Features = 2,
+  InstalledLocales = 3,
+  Product = 4,
+  Tags = 5,
+  PathProduct = 6
+}
+
+enum CascFileInfoClass {
+  ContentKey = 0,
+  EncodedKey = 1,
+  FullInfo = 2,
+  SpanInfo = 3
+}
+
+enum CascNameType {
+  Full = 0,
+  DataId = 1,
+  CKey = 2,
+  EKey = 3
+}
+```
+
+## Constants
+
+The package exports numerous constants from CascLib. Here are some commonly used ones:
+
+### File Open Flags
+```typescript
+CASC_OPEN_BY_NAME      // Open file by name
+CASC_OPEN_BY_CKEY      // Open file by content key
+CASC_OPEN_BY_EKEY      // Open file by encoded key
+CASC_OPEN_BY_FILEID    // Open file by file ID
+CASC_STRICT_DATA_CHECK // Enable strict data checking
+CASC_OVERCOME_ENCRYPTED // Try to overcome encryption
+```
+
+### Locale Flags
+```typescript
+CASC_LOCALE_ALL        // All locales
+CASC_LOCALE_ENUS       // English (US)
+CASC_LOCALE_KOKR       // Korean
+CASC_LOCALE_FRFR       // French
+CASC_LOCALE_DEDE       // German
+CASC_LOCALE_ZHCN       // Chinese (Simplified)
+CASC_LOCALE_ESES       // Spanish (Spain)
+CASC_LOCALE_ZHTW       // Chinese (Traditional)
+CASC_LOCALE_ENGB       // English (GB)
+// ... and more
+```
+
+### Content Flags
+```typescript
+CASC_CFLAG_INSTALL           // Install file
+CASC_CFLAG_LOAD_ON_WINDOWS   // Load on Windows
+CASC_CFLAG_LOAD_ON_MAC       // Load on macOS
+CASC_CFLAG_ENCRYPTED         // File is encrypted
+CASC_CFLAG_NO_COMPRESSION    // No compression
+// ... and more
+```
+
+### Feature Flags
+```typescript
+CASC_FEATURE_FILE_NAMES          // Storage has file names
+CASC_FEATURE_FILE_DATA_IDS       // Storage has file data IDs
+CASC_FEATURE_LOCALE_FLAGS        // Storage has locale flags
+CASC_FEATURE_ONLINE              // Online storage
+// ... and more
+```
+
+### File Positioning
+```typescript
+FILE_BEGIN     // Beginning of file
+FILE_CURRENT   // Current position
+FILE_END       // End of file
+```
+
+See [lib/bindings.ts](lib/bindings.ts) for a complete list of available constants.
 
 ## Advanced Usage
 
 ### Direct Binding Access
 
-For advanced users who need direct access to the native bindings:
+For advanced users who need direct access to the native bindings with exact CascLib.h function names:
 
 ```typescript
-import { CascStorageBinding, CascStorage, CascFile } from '@jamiephan/casclib/bindings';
-import * as constants from '@jamiephan/casclib';
+import { 
+  CascStorageBinding, 
+  CascStorage, 
+  CascFile, 
+  CASC_OPEN_BY_NAME 
+} from '@jamiephan/casclib';
 
+// Use the low-level binding interface directly
 const storage: CascStorage = new CascStorageBinding();
 storage.CascOpenStorage('/path/to/storage', 0);
 
-const file: CascFile = storage.CascOpenFile('filename.txt', constants.CASC_OPEN_BY_NAME);
+const file: CascFile = storage.CascOpenFile('filename.txt', CASC_OPEN_BY_NAME);
 const size = file.CascGetFileSize64();
 const content = file.readFileAll();
 file.CascCloseFile();
 
 storage.CascCloseStorage();
+```
+
+### Utility Functions
+
+The package also exports some utility functions:
+
+```typescript
+import { 
+  CascOpenLocalFile,
+  GetCascError,
+  SetCascError,
+  CascCdnGetDefault,
+  CascCdnDownload
+} from '@jamiephan/casclib';
+
+// Open a local file directly (outside of storage)
+const localFile = CascOpenLocalFile('/path/to/file.txt');
+
+// Get the last CASC error code
+const errorCode = GetCascError();
+
+// Get default CDN URL
+const defaultCdn = CascCdnGetDefault();
+
+// Download from CDN
+const data = CascCdnDownload(
+  'http://us.patch.battle.net:1119',
+  'hero',
+  'some-file.idx'
+);
 ```
 
 ### Binding Naming Convention
