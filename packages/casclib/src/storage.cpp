@@ -87,7 +87,8 @@ Napi::Value CascStorage::Open(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open CASC storage: " + path;
+    DWORD err = GetCascError();
+    std::string error = "Failed to open CASC storage: " + path + " [CascLib error: " + std::to_string(err) + "]";
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -136,7 +137,8 @@ Napi::Value CascStorage::OpenFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!CascOpenFile(hStorage, filename.c_str(), CASC_LOCALE_ALL, dwFlags, &hFile)) {
-    std::string error = "Failed to open file: " + filename;
+    DWORD err = GetCascError();
+    std::string error = "Failed to open file: " + filename + " [CascLib error: " + std::to_string(err) + "]";
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -165,6 +167,9 @@ Napi::Value CascStorage::GetFileInfo(const Napi::CallbackInfo& info) {
   
   HANDLE hFile;
   if (!CascOpenFile(hStorage, filename.c_str(), CASC_LOCALE_ALL, CASC_OPEN_BY_NAME, &hFile)) {
+    DWORD err = GetCascError();
+    std::string error = "Failed to open file for info: " + filename + " [CascLib error: " + std::to_string(err) + "]";
+    Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
 
@@ -235,7 +240,8 @@ Napi::Value CascStorage::OpenOnline(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenOnlineStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open online CASC storage: " + path;
+    DWORD err = GetCascError();
+    std::string error = "Failed to open online CASC storage: " + path + " [CascLib error: " + std::to_string(err) + "]";
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -323,7 +329,8 @@ Napi::Value CascStorage::OpenEx(const Napi::CallbackInfo& info) {
 
   // Call CascOpenStorageEx
   if (!CascOpenStorageEx(params.c_str(), &args, bOnlineStorage, &hStorage)) {
-    std::string error = "Failed to open CASC storage with extended parameters: " + params;
+    DWORD err = GetCascError();
+    std::string error = "Failed to open CASC storage with extended parameters: " + params + " [CascLib error: " + std::to_string(err) + "]";
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -357,6 +364,11 @@ Napi::Value CascStorage::GetStorageInfo(const Napi::CallbackInfo& info) {
       size_t bytesNeeded = 0;
       if (CascGetStorageInfo(hStorage, infoClass, &fileCount, sizeof(fileCount), &bytesNeeded)) {
         result.Set("fileCount", Napi::Number::New(env, fileCount));
+      } else {
+        DWORD err = GetCascError();
+        std::string error = "Failed to get storage info (file count) [CascLib error: " + std::to_string(err) + "]";
+        Napi::Error::New(env, error).ThrowAsJavaScriptException();
+        return env.Null();
       }
       break;
     }
@@ -365,6 +377,11 @@ Napi::Value CascStorage::GetStorageInfo(const Napi::CallbackInfo& info) {
       size_t bytesNeeded = 0;
       if (CascGetStorageInfo(hStorage, infoClass, &features, sizeof(features), &bytesNeeded)) {
         result.Set("features", Napi::Number::New(env, features));
+      } else {
+        DWORD err = GetCascError();
+        std::string error = "Failed to get storage info (features) [CascLib error: " + std::to_string(err) + "]";
+        Napi::Error::New(env, error).ThrowAsJavaScriptException();
+        return env.Null();
       }
       break;
     }
@@ -374,6 +391,11 @@ Napi::Value CascStorage::GetStorageInfo(const Napi::CallbackInfo& info) {
       if (CascGetStorageInfo(hStorage, infoClass, &product, sizeof(product), &bytesNeeded)) {
         result.Set("codeName", Napi::String::New(env, product.szCodeName));
         result.Set("buildNumber", Napi::Number::New(env, product.BuildNumber));
+      } else {
+        DWORD err = GetCascError();
+        std::string error = "Failed to get storage info (product) [CascLib error: " + std::to_string(err) + "]";
+        Napi::Error::New(env, error).ThrowAsJavaScriptException();
+        return env.Null();
       }
       break;
     }
