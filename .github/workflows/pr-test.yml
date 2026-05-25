@@ -6,11 +6,12 @@ on:
 
 jobs:
   test-pr:
-    name: Run Tests on PR
+    name: Test ${{ matrix.package }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-13, macos-latest]
         package: [casclib, stormlib]
     
     steps:

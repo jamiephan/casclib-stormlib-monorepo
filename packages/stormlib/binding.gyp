@@ -101,9 +101,29 @@
           "OS=='mac'",
           {
             "defines": [
-              "BZ_STRICT_ANSI",
-              "_7ZIP_ST",
-              "Z_SOLO=1"
+              "_7ZIP_ST"
+            ],
+            "sources!": [
+              "../../thirdparty/StormLib/src/bzip2/blocksort.c",
+              "../../thirdparty/StormLib/src/bzip2/bzlib.c",
+              "../../thirdparty/StormLib/src/bzip2/compress.c",
+              "../../thirdparty/StormLib/src/bzip2/crctable.c",
+              "../../thirdparty/StormLib/src/bzip2/decompress.c",
+              "../../thirdparty/StormLib/src/bzip2/huffman.c",
+              "../../thirdparty/StormLib/src/bzip2/randtable.c",
+              "../../thirdparty/StormLib/src/zlib/adler32.c",
+              "../../thirdparty/StormLib/src/zlib/compress.c",
+              "../../thirdparty/StormLib/src/zlib/crc32.c",
+              "../../thirdparty/StormLib/src/zlib/deflate.c",
+              "../../thirdparty/StormLib/src/zlib/inffast.c",
+              "../../thirdparty/StormLib/src/zlib/inflate.c",
+              "../../thirdparty/StormLib/src/zlib/inftrees.c",
+              "../../thirdparty/StormLib/src/zlib/trees.c",
+              "../../thirdparty/StormLib/src/zlib/zutil.c"
+            ],
+            "libraries": [
+              "-lz",
+              "-lbz2"
             ],
             "xcode_settings": {
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",

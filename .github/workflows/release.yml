@@ -117,16 +117,26 @@ jobs:
 
   # Build prebuilds for all platforms and Node versions
   build:
-    name: Build ${{ matrix.os }} - Node ${{ matrix.node }}
+    name: Build ${{ matrix.os }} (${{ matrix.arch }}) - Node ${{ matrix.node }}
     needs: validate
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             arch: x64
             node: 22
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            node: 22
           - os: windows-latest
             arch: x64
+            node: 22
+          - os: macos-13
+            arch: x64
+            node: 22
+          - os: macos-latest
+            arch: arm64
             node: 22
 
     runs-on: ${{ matrix.os }}
@@ -331,8 +341,9 @@ jobs:
 
             ## Supported Platforms
             This release includes prebuilt N-API binaries for:
-            - **Linux (x64)**
+            - **Linux (x64, arm64)**
             - **Windows (x64)**
+            - **macOS (x64, arm64)**
 
             If your platform is not listed, the package will build from source automatically.
 
