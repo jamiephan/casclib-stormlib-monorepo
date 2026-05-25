@@ -363,8 +363,6 @@ jobs:
             - **Linux (x64, arm64)**
             - **Windows (x64, arm64)**
 
-            macOS (x64, arm64) is supported but builds from source on install (requires Xcode CLT). The build is fully tested and the native bindings work — only prebuilt binaries are not shipped because GitHub Actions macOS runners cannot reach Blizzard's CDN for integration tests.
-
             If your platform is not listed, the package will build from source automatically.
 
             ## Documentation
