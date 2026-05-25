@@ -208,15 +208,9 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
     });
   });
 
-  // =====================================================================
-  // Coverage for commit c3ce564: Symbol.dispose, withStorage, hasFile
-  // alias, readFile/readFileAsString/readFileAsJson, extractFile,
-  // findAllFiles, getFileNames, forEachFile, getTotalFileCount.
-  // =====================================================================
-
-  describe("Helpers (commit c3ce564)", () => {
+  describe("Helpers", () => {
     let helperStorage: Storage;
-    const dataBuildId = "mods/heroesdata.stormmod/base.stormdata/GameData/DataBuildId.txt";
+    const dataBuildId = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
     const HELPERS_TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_helpers_hero";
     const HELPERS_CONN = `${HELPERS_TEMP_DIR}*hero*us`;
 

@@ -413,11 +413,6 @@ describe("ManualTutorialMapMechanics20260219.stormmap - Modify Operations", () =
   });
 });
 
-// =====================================================================
-// Coverage for commit c3ce564: Symbol.dispose, withArchive, fileExists
-// alias, Archive.readFile, SErrGetLastError/SErrSetLastError.
-// =====================================================================
-
 describe("Archive.fileExists (alias for hasFile)", () => {
   it("returns true for existing file", () => {
     const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "fileExists-true");
