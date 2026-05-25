@@ -328,13 +328,13 @@ jobs:
           # Fetch all tags from remote to ensure we see prior releases
           git fetch --tags --force
 
-          # Find latest tag for this package, excluding the one just created
-          PREV=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -v "^${CURRENT}$" | head -n 1)
+          # Find latest stable (non-prerelease) tag for this package, excluding the one just created
+          PREV=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -E "^${PACKAGE}/v[0-9]+\.[0-9]+\.[0-9]+$" | grep -v "^${CURRENT}$" | head -n 1)
 
           if [ -z "$PREV" ]; then
-            echo "No previous tag found for package $PACKAGE (first release)"
+            echo "No previous stable tag found for package $PACKAGE (first stable release)"
           else
-            echo "Previous tag for $PACKAGE: $PREV"
+            echo "Previous stable tag for $PACKAGE: $PREV"
           fi
 
           echo "previous_tag=$PREV" >> $GITHUB_OUTPUT

@@ -79,12 +79,12 @@ const storage = new Storage();
 storage.open('/path/to/heroes/HeroesData');
 
 // Check if a file exists
-if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/GameData/HeroData.xml')) {
+if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml')) {
   console.log('File exists!');
 }
 
 // Get file information
-const info = storage.getFileInfo('mods/heroesdata.stormmod/base.stormdata/GameData/HeroData.xml');
+const info = storage.getFileInfo('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml');
 if (info) {
   console.log(`File: ${info.name}, Size: ${info.size} bytes`);
 }
@@ -94,7 +94,7 @@ if (info) {
 
 ```typescript
 // Open and read a file
-const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/GameData/HeroData.xml');
+const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml');
 
 // Read all content at once
 const content = file.readAll();
@@ -133,9 +133,10 @@ storage.openOnline('/tmp/casc/cache*hero*us');
 // Full format with all parameters
 storage.openOnline('C:/Temp/CASC/Cache*http://us.patch.battle.net:1119*hero*us');
 
-if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/UI/Layout.xml')) {
-  const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/UI/Layout.xml');
+if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml')) {
+  const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml');
   const data = file.readAll();
+  console.log(data.toString())
   file.close();
 }
 
@@ -191,7 +192,7 @@ async function readGameFile() {
   try {
     storage.open('/path/to/heroes/HeroesData');
     
-    const heroDataPath = 'mods/heroesdata.stormmod/base.stormdata/GameData/HeroData.xml';
+    const heroDataPath = 'mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml';
     if (storage.fileExists(heroDataPath)) {
       const file = storage.openFile(heroDataPath);
       const content = file.readAll();
@@ -330,7 +331,7 @@ Opens a file from the storage.
 
 **Example:**
 ```typescript
-const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/GameData/HeroData.xml');
+const file = storage.openFile('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml');
 ```
 
 ##### `fileExists(filename: string): boolean`
