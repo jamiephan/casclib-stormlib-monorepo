@@ -3,11 +3,11 @@
 #include "file.h"
 #include "StormLib.h"
 
-static Napi::Value GetLastError(const Napi::CallbackInfo& info) {
+static Napi::Value JsSErrGetLastError(const Napi::CallbackInfo& info) {
   return Napi::Number::New(info.Env(), SErrGetLastError());
 }
 
-static Napi::Value SetLastError(const Napi::CallbackInfo& info) {
+static Napi::Value JsSErrSetLastError(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 1 || !info[0].IsNumber()) {
     Napi::TypeError::New(env, "Expected error code as first argument")
@@ -26,8 +26,8 @@ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
   MpqFile::Init(env, exports);
 
   // Error code accessors (symmetric with casclib's GetCascError/SetCascError)
-  exports.Set("SErrGetLastError", Napi::Function::New(env, GetLastError));
-  exports.Set("SErrSetLastError", Napi::Function::New(env, SetLastError));
+  exports.Set("SErrGetLastError", Napi::Function::New(env, JsSErrGetLastError));
+  exports.Set("SErrSetLastError", Napi::Function::New(env, JsSErrSetLastError));
 
   return exports;
 }
