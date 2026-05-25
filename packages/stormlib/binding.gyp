@@ -8,6 +8,7 @@
         "src/addon.cpp",
         "src/archive.cpp",
         "src/file.cpp",
+        "src/errors.cpp",
         "../../thirdparty/StormLib/src/FileStream.cpp",
         "../../thirdparty/StormLib/src/SBaseCommon.cpp",
         "../../thirdparty/StormLib/src/SBaseDumpData.cpp",

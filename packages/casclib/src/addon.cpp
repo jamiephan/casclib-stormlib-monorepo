@@ -2,6 +2,7 @@
 #include <string>
 #include "storage.h"
 #include "file.h"
+#include "errors.h"
 #include "CascLib.h"
 #include "CascCommon.h"
 
@@ -31,7 +32,7 @@ Napi::Value OpenLocalFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!CascOpenLocalFile(filename.c_str(), flags, &hFile)) {
-    std::string error = "Failed to open local file: " + filename;
+    std::string error = "Failed to open local file: " + filename + FormatCascError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
