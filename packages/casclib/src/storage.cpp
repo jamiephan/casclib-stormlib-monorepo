@@ -1,5 +1,6 @@
 #include "storage.h"
 #include "file.h"
+#include "errors.h"
 #include <string>
 
 Napi::FunctionReference CascStorage::constructor;
@@ -87,7 +88,7 @@ Napi::Value CascStorage::Open(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open CASC storage: " + path;
+    std::string error = "Failed to open CASC storage: " + path + FormatCascError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -136,7 +137,7 @@ Napi::Value CascStorage::OpenFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!CascOpenFile(hStorage, filename.c_str(), CASC_LOCALE_ALL, dwFlags, &hFile)) {
-    std::string error = "Failed to open file: " + filename;
+    std::string error = "Failed to open file: " + filename + FormatCascError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -235,7 +236,7 @@ Napi::Value CascStorage::OpenOnline(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenOnlineStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open online CASC storage: " + path;
+    std::string error = "Failed to open online CASC storage: " + path + FormatCascError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -323,7 +324,7 @@ Napi::Value CascStorage::OpenEx(const Napi::CallbackInfo& info) {
 
   // Call CascOpenStorageEx
   if (!CascOpenStorageEx(params.c_str(), &args, bOnlineStorage, &hStorage)) {
-    std::string error = "Failed to open CASC storage with extended parameters: " + params;
+    std::string error = "Failed to open CASC storage with extended parameters: " + params + FormatCascError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }

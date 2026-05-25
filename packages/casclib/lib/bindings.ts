@@ -293,6 +293,7 @@ export const CASC_FEATURE_DATA_ARCHIVES: number = bindings.CASC_FEATURE_DATA_ARC
 export const CASC_FEATURE_DATA_FILES: number = bindings.CASC_FEATURE_DATA_FILES;
 export const CASC_FEATURE_ONLINE: number = bindings.CASC_FEATURE_ONLINE;
 export const CASC_FEATURE_FORCE_DOWNLOAD: number = bindings.CASC_FEATURE_FORCE_DOWNLOAD;
+export const CASC_FEATURE_ALLOW_DOWNLOAD: number = bindings.CASC_FEATURE_ALLOW_DOWNLOAD;
 
 // Key length
 export const CASC_KEY_LENGTH: number = bindings.CASC_KEY_LENGTH;

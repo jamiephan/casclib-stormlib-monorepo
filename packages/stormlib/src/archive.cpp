@@ -1,5 +1,6 @@
 #include "archive.h"
 #include "file.h"
+#include "errors.h"
 #include <string>
 
 Napi::FunctionReference MpqArchive::constructor;
@@ -89,7 +90,7 @@ Napi::Value MpqArchive::Open(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileOpenArchive(path.c_str(), 0, flags, &hMpq)) {
-    std::string error = "Failed to open MPQ archive: " + path;
+    std::string error = "Failed to open MPQ archive: " + path + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -126,7 +127,7 @@ Napi::Value MpqArchive::Create(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileCreateArchive(path.c_str(), flags, maxFileCount, &hMpq)) {
-    std::string error = "Failed to create MPQ archive: " + path;
+    std::string error = "Failed to create MPQ archive: " + path + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -175,7 +176,7 @@ Napi::Value MpqArchive::OpenFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!SFileOpenFileEx(hMpq, filename.c_str(), flags, &hFile)) {
-    std::string error = "Failed to open file: " + filename;
+    std::string error = "Failed to open file: " + filename + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -225,7 +226,7 @@ Napi::Value MpqArchive::ExtractFile(const Napi::CallbackInfo& info) {
   std::string dest = info[1].As<Napi::String>().Utf8Value();
 
   if (!SFileExtractFile(hMpq, source.c_str(), dest.c_str(), 0)) {
-    std::string error = "Failed to extract file: " + source;
+    std::string error = "Failed to extract file: " + source + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -257,7 +258,7 @@ Napi::Value MpqArchive::AddFile(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddFileEx(hMpq, source.c_str(), archiveName.c_str(), flags, MPQ_COMPRESSION_ZLIB, MPQ_COMPRESSION_ZLIB)) {
-    std::string error = "Failed to add file: " + source;
+    std::string error = "Failed to add file: " + source + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -283,7 +284,7 @@ Napi::Value MpqArchive::RemoveFile(const Napi::CallbackInfo& info) {
   std::string filename = info[0].As<Napi::String>().Utf8Value();
 
   if (!SFileRemoveFile(hMpq, filename.c_str(), 0)) {
-    std::string error = "Failed to remove file: " + filename;
+    std::string error = "Failed to remove file: " + filename + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -310,7 +311,7 @@ Napi::Value MpqArchive::RenameFile(const Napi::CallbackInfo& info) {
   std::string newName = info[1].As<Napi::String>().Utf8Value();
 
   if (!SFileRenameFile(hMpq, oldName.c_str(), newName.c_str())) {
-    std::string error = "Failed to rename file: " + oldName;
+    std::string error = "Failed to rename file: " + oldName + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -328,7 +329,7 @@ Napi::Value MpqArchive::Compact(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileCompactArchive(hMpq, nullptr, 0)) {
-    Napi::Error::New(env, "Failed to compact archive")
+    Napi::Error::New(env, "Failed to compact archive" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -361,7 +362,7 @@ Napi::Value MpqArchive::Flush(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileFlushArchive(hMpq)) {
-    Napi::Error::New(env, "Failed to flush archive")
+    Napi::Error::New(env, "Failed to flush archive" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -387,7 +388,7 @@ Napi::Value MpqArchive::SetMaxFileCount(const Napi::CallbackInfo& info) {
   DWORD maxFileCount = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetMaxFileCount(hMpq, maxFileCount)) {
-    Napi::Error::New(env, "Failed to set max file count")
+    Napi::Error::New(env, "Failed to set max file count" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -426,7 +427,7 @@ Napi::Value MpqArchive::SetAttributes(const Napi::CallbackInfo& info) {
   DWORD attributes = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetAttributes(hMpq, attributes)) {
-    Napi::Error::New(env, "Failed to set attributes")
+    Napi::Error::New(env, "Failed to set attributes" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -468,7 +469,7 @@ Napi::Value MpqArchive::AddFileEx(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddFileEx(hMpq, source.c_str(), archiveName.c_str(), flags, compression, compressionNext)) {
-    std::string error = "Failed to add file: " + source;
+    std::string error = "Failed to add file: " + source + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -550,7 +551,7 @@ Napi::Value MpqArchive::SignArchive(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileSignArchive(hMpq, signatureType)) {
-    Napi::Error::New(env, "Failed to sign archive")
+    Napi::Error::New(env, "Failed to sign archive" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -578,7 +579,7 @@ Napi::Value MpqArchive::GetFileChecksums(const Napi::CallbackInfo& info) {
   char md5[33] = {0}; // 32 chars + null terminator
 
   if (!SFileGetFileChecksums(hMpq, filename.c_str(), &crc32, md5)) {
-    Napi::Error::New(env, "Failed to get file checksums")
+    Napi::Error::New(env, "Failed to get file checksums" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -640,7 +641,7 @@ Napi::Value MpqArchive::OpenPatchArchive(const Napi::CallbackInfo& info) {
   if (!SFileOpenPatchArchive(hMpq, patchPath.c_str(), 
                              patchPrefix.empty() ? nullptr : patchPrefix.c_str(), 
                              flags)) {
-    Napi::Error::New(env, "Failed to open patch archive")
+    Napi::Error::New(env, "Failed to open patch archive" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -732,7 +733,7 @@ Napi::Value MpqArchive::EnumLocales(const Napi::CallbackInfo& info) {
   DWORD result = SFileEnumLocales(hMpq, filename.c_str(), locales, &maxLocales, searchScope);
   
   if (result != ERROR_SUCCESS) {
-    Napi::Error::New(env, "Failed to enumerate locales")
+    Napi::Error::New(env, "Failed to enumerate locales" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -776,7 +777,7 @@ Napi::Value MpqArchive::CreateFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!SFileCreateFile(hMpq, filename.c_str(), fileTime, fileSize, locale, flags, &hFile)) {
-    Napi::Error::New(env, "Failed to create file in archive")
+    Napi::Error::New(env, "Failed to create file in archive" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -815,7 +816,7 @@ Napi::Value MpqArchive::AddWave(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddWave(hMpq, source.c_str(), archiveName.c_str(), flags, quality)) {
-    std::string error = "Failed to add wave file: " + source;
+    std::string error = "Failed to add wave file: " + source + FormatStormError();
     Napi::Error::New(env, error).ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -841,7 +842,7 @@ Napi::Value MpqArchive::UpdateFileAttributes(const Napi::CallbackInfo& info) {
   std::string filename = info[0].As<Napi::String>().Utf8Value();
 
   if (!SFileUpdateFileAttributes(hMpq, filename.c_str())) {
-    Napi::Error::New(env, "Failed to update file attributes")
+    Napi::Error::New(env, "Failed to update file attributes" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -877,7 +878,7 @@ Napi::Value MpqArchive::GetFileInfo(const Napi::CallbackInfo& info) {
   // Allocate buffer and get info
   std::vector<uint8_t> buffer(lengthNeeded);
   if (!SFileGetFileInfo(hMpq, infoClass, buffer.data(), lengthNeeded, nullptr)) {
-    Napi::Error::New(env, "Failed to get file info")
+    Napi::Error::New(env, "Failed to get file info" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }

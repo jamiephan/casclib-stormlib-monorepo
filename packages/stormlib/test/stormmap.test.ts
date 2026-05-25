@@ -1,4 +1,4 @@
-import { Archive, File } from "../lib";
+import { Archive, File, withArchive, SErrGetLastError, SErrSetLastError } from "../lib";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -408,7 +408,182 @@ describe("ManualTutorialMapMechanics20260219.stormmap - Modify Operations", () =
     archive.flush(); // Flush after renaming
     expect(archive.hasFile("original.txt")).toBe(false);
     expect(archive.hasFile("renamed.txt")).toBe(true);
-    
+
     archive.close();
+  });
+});
+
+describe("Archive.fileExists (alias for hasFile)", () => {
+  it("returns true for existing file", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "fileExists-true");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    try {
+      expect(archive.fileExists("MapScript.galaxy")).toBe(true);
+      expect(archive.fileExists("MapScript.galaxy")).toBe(archive.hasFile("MapScript.galaxy"));
+    } finally {
+      archive.close();
+    }
+  });
+
+  it("returns false for missing file", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "fileExists-false");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    try {
+      expect(archive.fileExists("does/not/exist.xyz")).toBe(false);
+    } finally {
+      archive.close();
+    }
+  });
+});
+
+describe("Archive.readFile", () => {
+  it("returns Buffer matching manual openFile().readAll()", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "readFile-match");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    try {
+      const f = archive.openFile("MapScript.galaxy");
+      const manual = f.readAll();
+      f.close();
+      const helper = archive.readFile("MapScript.galaxy");
+      expect(Buffer.isBuffer(helper)).toBe(true);
+      expect(helper.equals(manual)).toBe(true);
+    } finally {
+      archive.close();
+    }
+  });
+
+  it("propagates errors and keeps the archive usable", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "readFile-nonexistent");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    try {
+      expect(() => archive.readFile("nonexistent/file.txt")).toThrow();
+      expect(archive.hasFile("MapScript.galaxy")).toBe(true);
+    } finally {
+      archive.close();
+    }
+  });
+});
+
+describe("withArchive", () => {
+  it("invokes callback and returns its value", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "withArchive-return");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const result = withArchive(a => {
+      a.open(dst);
+      const f = a.openFile("MapScript.galaxy");
+      const content = f.readAll().toString("utf-8");
+      f.close();
+      return content;
+    });
+    expect(typeof result).toBe("string");
+    expect(result).toContain("Alterac Pass");
+  });
+
+  it("closes archive after callback completes", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "withArchive-close");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    let captured: Archive | null = null;
+    withArchive(a => {
+      a.open(dst);
+      captured = a;
+    });
+    expect(captured).not.toBeNull();
+    expect(() => captured!.hasFile("anything")).toThrow(/not open/i);
+  });
+
+  it("closes archive even when callback throws", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "withArchive-throw");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    let captured: Archive | null = null;
+    const sentinel = new Error("boom");
+    expect(() => withArchive(a => {
+      a.open(dst);
+      captured = a;
+      throw sentinel;
+    })).toThrow(sentinel);
+    expect(captured).not.toBeNull();
+    expect(() => captured!.hasFile("anything")).toThrow(/not open/i);
+  });
+});
+
+describe("Symbol.dispose", () => {
+  it("is defined on the global Symbol after module load", () => {
+    expect(typeof (Symbol as any).dispose).toBe("symbol");
+  });
+
+  it("Archive[Symbol.dispose] closes the archive", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "dispose-archive");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    expect(archive.hasFile("MapScript.galaxy")).toBe(true);
+    (archive as any)[(Symbol as any).dispose]();
+    expect(() => archive.hasFile("MapScript.galaxy")).toThrow(/not open/i);
+  });
+
+  it("File[Symbol.dispose] closes the file", () => {
+    const testDir = path.join(os.tmpdir(), "STORMLIB_TEST", "stormmap", "dispose-file");
+    ensureDir(testDir);
+    const dst = path.join(testDir, "AlteracPass.stormmap");
+    fs.copyFileSync(alteracPassMap, dst);
+
+    const archive = new Archive();
+    archive.open(dst);
+    try {
+      const f = archive.openFile("MapScript.galaxy");
+      expect(f.readAll().length).toBeGreaterThan(0);
+      (f as any)[(Symbol as any).dispose]();
+      expect(f.close()).toBe(false);
+    } finally {
+      archive.close();
+    }
+  });
+});
+
+describe("SErrGetLastError / SErrSetLastError", () => {
+  it("round-trips an error code", () => {
+    SErrSetLastError(12345);
+    expect(SErrGetLastError()).toBe(12345);
+    SErrSetLastError(0);
+    expect(SErrGetLastError()).toBe(0);
+  });
+
+  it("reports a non-zero code after a failed open", () => {
+    SErrSetLastError(0);
+    const archive = new Archive();
+    expect(() => archive.open("/definitely/not/a/real/path.mpq")).toThrow();
+    expect(SErrGetLastError()).not.toBe(0);
   });
 });

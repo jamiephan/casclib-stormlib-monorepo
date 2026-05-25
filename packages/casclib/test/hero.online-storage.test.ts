@@ -1,5 +1,6 @@
-import { Storage, File } from "../lib";
+import { Storage, File, withStorage } from "../lib";
 import * as fs from "fs";
+import * as path from "path";
 import * as os from "os";
 
 const TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_hero";
@@ -204,6 +205,176 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
     it("should export File", () => {
       expect(File).toBeDefined();
       expect(typeof File).toBe("function");
+    });
+  });
+
+  describe("Helpers", () => {
+    let helperStorage: Storage;
+    const dataBuildId = "mods/core.stormmod/base.stormdata/DataBuildId.txt";
+    const HELPERS_TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_helpers_hero";
+    const HELPERS_CONN = `${HELPERS_TEMP_DIR}*hero*us`;
+
+    beforeAll(() => {
+      helperStorage = new Storage();
+      helperStorage.openOnline(HELPERS_CONN);
+    });
+
+    afterAll(() => {
+      if (helperStorage) {
+        try { helperStorage.close(); } catch { /* ignore */ }
+        if (fs.existsSync(HELPERS_TEMP_DIR)) {
+          try { fs.rmSync(HELPERS_TEMP_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      }
+    });
+
+    describe("Storage.hasFile (alias for fileExists)", () => {
+      it("returns same result as fileExists for existing file", () => {
+        expect(helperStorage.hasFile(dataBuildId)).toBe(true);
+        expect(helperStorage.hasFile(dataBuildId)).toBe(helperStorage.fileExists(dataBuildId));
+      });
+
+      it("returns false for missing file", () => {
+        expect(helperStorage.hasFile("does/not/exist.xyz")).toBe(false);
+      });
+    });
+
+    describe("Storage.readFile / readFileAsString / readFileAsJson", () => {
+      it("readFile returns non-empty Buffer", () => {
+        const buf = helperStorage.readFile(dataBuildId);
+        expect(Buffer.isBuffer(buf)).toBe(true);
+        expect(buf.length).toBeGreaterThan(0);
+      });
+
+      it("readFileAsString decodes the same bytes as readFile", () => {
+        const buf = helperStorage.readFile(dataBuildId);
+        const str = helperStorage.readFileAsString(dataBuildId);
+        expect(str).toBe(buf.toString("utf-8"));
+        expect(str.startsWith("B")).toBe(true);
+      });
+
+      it("readFileAsJson throws SyntaxError on non-JSON content", () => {
+        expect(() => helperStorage.readFileAsJson(dataBuildId)).toThrow(SyntaxError);
+      });
+    });
+
+    describe("Storage.extractFile", () => {
+      it("writes contents to disk and returns byte count", () => {
+        const out = path.join(os.tmpdir(), `casclib_extractFile_${Date.now()}.bin`);
+        try {
+          const written = helperStorage.extractFile(dataBuildId, out);
+          const stat = fs.statSync(out);
+          expect(written).toBe(stat.size);
+          expect(written).toBeGreaterThan(0);
+        } finally {
+          if (fs.existsSync(out)) fs.unlinkSync(out);
+        }
+      });
+    });
+
+    describe("Storage.findAllFiles / getFileNames / forEachFile", () => {
+      it("findAllFiles returns an array of CascFindData entries", () => {
+        const entries = helperStorage.findAllFiles("*.xml");
+        expect(Array.isArray(entries)).toBe(true);
+        expect(entries.length).toBeGreaterThan(0);
+        expect(entries[0]).toHaveProperty("fileName");
+        expect(entries[0]).toHaveProperty("fileSize");
+      });
+
+      it("getFileNames returns string array equal to fileName-mapped entries", () => {
+        const names = helperStorage.getFileNames("*.txt");
+        const entries = helperStorage.findAllFiles("*.txt");
+        expect(names).toEqual(entries.map(e => e.fileName));
+      });
+
+      it("forEachFile visits each entry exactly once", () => {
+        const seen: string[] = [];
+        helperStorage.forEachFile("*.txt", e => { seen.push(e.fileName); });
+        const names = helperStorage.getFileNames("*.txt");
+        expect(seen.slice().sort()).toEqual(names.slice().sort());
+      });
+
+      it("forEachFile stops when callback returns false", () => {
+        let count = 0;
+        helperStorage.forEachFile("*.xml", () => {
+          count++;
+          if (count >= 2) return false;
+          return undefined;
+        });
+        expect(count).toBe(2);
+      });
+    });
+
+    describe("Storage.getTotalFileCount", () => {
+      it("returns a positive integer", () => {
+        const total = helperStorage.getTotalFileCount();
+        expect(Number.isInteger(total)).toBe(true);
+        expect(total).toBeGreaterThan(0);
+      });
+    });
+
+    describe("withStorage", () => {
+      const WS_TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_withStorage_hero";
+      const WS_CONN = `${WS_TEMP_DIR}*hero*us`;
+
+      afterAll(() => {
+        if (fs.existsSync(WS_TEMP_DIR)) {
+          try { fs.rmSync(WS_TEMP_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      });
+
+      it("invokes callback and returns its value", () => {
+        const got = withStorage(s => {
+          s.openOnline(WS_CONN);
+          return s.fileExists(dataBuildId);
+        });
+        expect(got).toBe(true);
+      });
+
+      it("closes storage even when callback throws", () => {
+        const sentinel = new Error("boom");
+        expect(() => withStorage(s => {
+          s.openOnline(WS_CONN);
+          throw sentinel;
+        })).toThrow(sentinel);
+      });
+
+      it("tolerates a callback that closes the storage itself", () => {
+        expect(() => withStorage(s => {
+          s.openOnline(WS_CONN);
+          s.close();
+        })).not.toThrow();
+      });
+    });
+
+    describe("Symbol.dispose", () => {
+      it("is defined on the global Symbol after module load", () => {
+        expect(typeof (Symbol as any).dispose).toBe("symbol");
+      });
+
+      it("Storage[Symbol.dispose] closes the storage", () => {
+        const tmp = os.tmpdir() + "/CASCLIB_TESTS_dispose_hero";
+        const conn = `${tmp}*hero*us`;
+        const s = new Storage();
+        try {
+          s.openOnline(conn);
+          expect(s.fileExists(dataBuildId)).toBe(true);
+          (s as any)[(Symbol as any).dispose]();
+          expect(() => s.fileExists("anything")).toThrow(/not open/i);
+        } finally {
+          try { s.close(); } catch { /* already closed */ }
+          if (fs.existsSync(tmp)) {
+            try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* ignore */ }
+          }
+        }
+      });
+
+      it("File[Symbol.dispose] closes the file", () => {
+        const f = helperStorage.openFile(dataBuildId);
+        expect(f.readAll().length).toBeGreaterThan(0);
+        (f as any)[(Symbol as any).dispose]();
+        expect(f.close()).toBe(false);
+      });
     });
   });
 });

@@ -99,3 +99,15 @@ export interface MPQFile {
 export const MPQArchiveBinding: MPQArchiveConstructor = bindings.Archive;
 export const MPQFileBinding: new () => MPQFile = bindings.File;
 
+/**
+ * Last error code from the most recent StormLib operation.
+ * Symmetric with casclib's GetCascError.
+ */
+export const SErrGetLastError: () => number = bindings.SErrGetLastError;
+
+/**
+ * Set the StormLib last-error code. Useful for resetting before an operation.
+ * Symmetric with casclib's SetCascError.
+ */
+export const SErrSetLastError: (code: number) => void = bindings.SErrSetLastError;
+

@@ -8,6 +8,7 @@
         "src/addon.cpp",
         "src/storage.cpp",
         "src/file.cpp",
+        "src/errors.cpp",
         "../../thirdparty/CascLib/src/CascDecompress.cpp",
         "../../thirdparty/CascLib/src/CascDecrypt.cpp",
         "../../thirdparty/CascLib/src/CascDumpData.cpp",

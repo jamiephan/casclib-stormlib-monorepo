@@ -1,4 +1,5 @@
 #include "file.h"
+#include "errors.h"
 #include <vector>
 
 Napi::FunctionReference CascFile::constructor;
@@ -66,7 +67,7 @@ Napi::Value CascFile::Read(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!CascReadFile(hFile, buffer.data(), bytesToRead, &bytesRead)) {
-    Napi::Error::New(env, "Failed to read file")
+    Napi::Error::New(env, "Failed to read file" + FormatCascError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -93,7 +94,7 @@ Napi::Value CascFile::ReadAll(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!CascReadFile(hFile, buffer.data(), fileSize, &bytesRead)) {
-    Napi::Error::New(env, "Failed to read file")
+    Napi::Error::New(env, "Failed to read file" + FormatCascError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -177,7 +178,7 @@ Napi::Value CascFile::GetSize64(const Napi::CallbackInfo& info) {
 
   ULONGLONG fileSize = 0;
   if (!CascGetFileSize64(hFile, &fileSize)) {
-    Napi::Error::New(env, "Failed to get file size")
+    Napi::Error::New(env, "Failed to get file size" + FormatCascError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -196,7 +197,7 @@ Napi::Value CascFile::GetPosition64(const Napi::CallbackInfo& info) {
 
   ULONGLONG position = 0;
   if (!CascSetFilePointer64(hFile, 0, &position, FILE_CURRENT)) {
-    Napi::Error::New(env, "Failed to get file position")
+    Napi::Error::New(env, "Failed to get file position" + FormatCascError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -228,7 +229,7 @@ Napi::Value CascFile::SetPosition64(const Napi::CallbackInfo& info) {
 
   ULONGLONG newPosition = 0;
   if (!CascSetFilePointer64(hFile, position, &newPosition, moveMethod)) {
-    Napi::Error::New(env, "Failed to set file position")
+    Napi::Error::New(env, "Failed to set file position" + FormatCascError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }

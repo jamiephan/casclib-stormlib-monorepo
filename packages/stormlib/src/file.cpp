@@ -1,4 +1,5 @@
 #include "file.h"
+#include "errors.h"
 #include <vector>
 
 Napi::FunctionReference MpqFile::constructor;
@@ -66,7 +67,7 @@ Napi::Value MpqFile::Read(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!SFileReadFile(hFile, buffer.data(), bytesToRead, &bytesRead, nullptr)) {
-    Napi::Error::New(env, "Failed to read file")
+    Napi::Error::New(env, "Failed to read file" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -93,7 +94,7 @@ Napi::Value MpqFile::ReadAll(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!SFileReadFile(hFile, buffer.data(), fileSize, &bytesRead, nullptr)) {
-    Napi::Error::New(env, "Failed to read file")
+    Napi::Error::New(env, "Failed to read file" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -189,7 +190,7 @@ Napi::Value MpqFile::Write(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileWriteFile(hFile, buffer.Data(), buffer.Length(), compression)) {
-    Napi::Error::New(env, "Failed to write to file")
+    Napi::Error::New(env, "Failed to write to file" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -207,7 +208,7 @@ Napi::Value MpqFile::Finish(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileFinishFile(hFile)) {
-    Napi::Error::New(env, "Failed to finish file")
+    Napi::Error::New(env, "Failed to finish file" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -230,7 +231,7 @@ Napi::Value MpqFile::GetFileName(const Napi::CallbackInfo& info) {
 
   char filename[MAX_PATH];
   if (!SFileGetFileName(hFile, filename)) {
-    Napi::Error::New(env, "Failed to get file name")
+    Napi::Error::New(env, "Failed to get file name" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -256,7 +257,7 @@ Napi::Value MpqFile::SetLocale(const Napi::CallbackInfo& info) {
   LCID newLocale = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetFileLocale(hFile, newLocale)) {
-    Napi::Error::New(env, "Failed to set file locale")
+    Napi::Error::New(env, "Failed to set file locale" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -292,7 +293,7 @@ Napi::Value MpqFile::GetFileInfo(const Napi::CallbackInfo& info) {
   // Allocate buffer and get info
   std::vector<uint8_t> buffer(lengthNeeded);
   if (!SFileGetFileInfo(hFile, infoClass, buffer.data(), lengthNeeded, nullptr)) {
-    Napi::Error::New(env, "Failed to get file info")
+    Napi::Error::New(env, "Failed to get file info" + FormatStormError())
       .ThrowAsJavaScriptException();
     return env.Null();
   }
