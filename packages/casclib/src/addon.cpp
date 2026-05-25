@@ -242,6 +242,7 @@ Napi::Object InitAll(Napi::Env env, Napi::Object exports) {
   exports.Set("CASC_FEATURE_DATA_FILES", Napi::Number::New(env, CASC_FEATURE_DATA_FILES));
   exports.Set("CASC_FEATURE_ONLINE", Napi::Number::New(env, CASC_FEATURE_ONLINE));
   exports.Set("CASC_FEATURE_FORCE_DOWNLOAD", Napi::Number::New(env, CASC_FEATURE_FORCE_DOWNLOAD));
+  exports.Set("CASC_FEATURE_ALLOW_DOWNLOAD", Napi::Number::New(env, CASC_FEATURE_ALLOW_DOWNLOAD));
 
   // Export constants - Key length
   exports.Set("CASC_KEY_LENGTH", Napi::Number::New(env, CASC_KEY_LENGTH));
