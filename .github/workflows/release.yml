@@ -33,7 +33,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch all history for proper tagging
           ref: master
@@ -140,21 +140,21 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: master
           submodules: recursive
 
       - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v6
         with:
-          version: 8
+          version: 10.33.4
 
       - name: Update package.json version (temporary)
         shell: bash
@@ -194,7 +194,7 @@ jobs:
           CI: true
 
       - name: Upload prebuild
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: prebuilds-${{ runner.os }}-${{ matrix.arch }}-node${{ matrix.node }}
           path: packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
@@ -264,7 +264,7 @@ jobs:
         run: pnpm run build
 
       - name: Download all prebuilds
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: artifacts
           pattern: prebuilds-*
@@ -318,14 +318,36 @@ jobs:
           git push origin "$TAG"
           echo "✓ Successfully pushed commit and tag: $TAG"
 
+      - name: Find previous tag for package
+        id: prev_tag
+        shell: bash
+        run: |
+          PACKAGE="${{ needs.validate.outputs.package }}"
+          CURRENT="${{ inputs.tag }}"
+
+          # Fetch all tags from remote to ensure we see prior releases
+          git fetch --tags --force
+
+          # Find latest tag for this package, excluding the one just created
+          PREV=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -v "^${CURRENT}$" | head -n 1)
+
+          if [ -z "$PREV" ]; then
+            echo "No previous tag found for package $PACKAGE (first release)"
+          else
+            echo "Previous tag for $PACKAGE: $PREV"
+          fi
+
+          echo "previous_tag=$PREV" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
           name: '@jamiephan/${{ needs.validate.outputs.package }} v${{ needs.validate.outputs.version }}'
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
+          previous_tag: ${{ steps.prev_tag.outputs.previous_tag }}
           body: |            
             ${{ needs.validate.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
 
@@ -373,7 +395,7 @@ jobs:
 
       - name: Comment on related PRs
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const package = '${{ needs.validate.outputs.package }}';
