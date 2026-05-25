@@ -1,5 +1,5 @@
-import { 
-  MPQArchiveBinding, 
+import {
+  MPQArchiveBinding,
   MPQArchive,
   MPQFile,
   FileInfo
@@ -8,6 +8,12 @@ import {
 // Re-export all constants
 export * from './constants';
 export { FileInfo } from './bindings';
+
+// Polyfill Symbol.dispose for Node versions / TS targets without it (TS <5.2 / Node <20).
+const kDispose: symbol = (Symbol as any).dispose ?? Symbol.for('nodejs.dispose');
+if (!(Symbol as any).dispose) {
+  (Symbol as any).dispose = kDispose;
+}
 
 /**
  * Options for opening an MPQ archive
@@ -476,6 +482,58 @@ export class Archive {
     const compressedSize = this.getTotalCompressedSize();
     return compressedSize / totalSize;
   }
+
+  // ---------------------------------------------------------------------------
+  // Symmetry with casclib's Storage API
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Alias for hasFile — symmetry with casclib's Storage.fileExists().
+   */
+  fileExists(filename: string): boolean {
+    return this.hasFile(filename);
+  }
+
+  /**
+   * Read a file from the archive and return it as a Buffer.
+   * Opens and closes the file internally.
+   */
+  readFile(filename: string, options?: FileOpenOptions): Buffer {
+    const file = this.openFile(filename, options);
+    try {
+      return file.readAll();
+    } finally {
+      file.close();
+    }
+  }
+
+  /**
+   * Symbol.dispose support for `using`/`await using` blocks (TS 5.2+).
+   */
+  [kDispose](): void {
+    this.close();
+  }
+}
+
+/**
+ * Open an archive, run a callback, and guarantee close() — even on throw.
+ * Mirrors casclib's withStorage().
+ *
+ * @example
+ *   const text = withArchive(a => {
+ *     a.open('/path/to/foo.mpq');
+ *     return a.readFileAsString('readme.txt');
+ *   });
+ */
+export function withArchive<T>(
+  fn: (archive: Archive) => T
+): T {
+  const archive = new Archive();
+  try {
+    return fn(archive);
+  } finally {
+    try { archive.close(); } catch { /* already closed */ }
+  }
 }
 
 /**
@@ -581,6 +639,13 @@ export class File {
    */
   getFileInfo(infoClass: number): Buffer | null {
     return this.file.SFileGetFileInfo(infoClass);
+  }
+
+  /**
+   * Symbol.dispose support for `using`/`await using` blocks (TS 5.2+).
+   */
+  [kDispose](): void {
+    this.close();
   }
 }
 
