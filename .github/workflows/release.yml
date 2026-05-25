@@ -132,6 +132,9 @@ jobs:
           - os: windows-latest
             arch: x64
             node: 22
+          - os: windows-11-arm
+            arch: arm64
+            node: 22
           - os: macos-13
             arch: x64
             node: 22
@@ -342,7 +345,7 @@ jobs:
             ## Supported Platforms
             This release includes prebuilt N-API binaries for:
             - **Linux (x64, arm64)**
-            - **Windows (x64)**
+            - **Windows (x64, arm64)**
             - **macOS (x64, arm64)**
 
             If your platform is not listed, the package will build from source automatically.

@@ -105,13 +105,11 @@ stormlib tests use local MPQ fixtures under `packages/stormlib/test/files/`.
 
 - Input `tag` must match `^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` (e.g. `casclib/v1.0.0`, `stormlib/v0.0.0-dev.3`).
 - Input `npm_tag` is `latest` or `dev`.
-- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `macos-13` (mac x64), `macos-latest` (mac arm64).
+- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64), `macos-13` (mac x64), `macos-latest` (mac arm64).
 - Publishes with `npm publish --provenance --access public --tag <npm_tag>` from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments on the 5 most recent merged PRs.
 - **Versions are not bumped manually** — let the workflow do it. Don't tag locally.
 
-`.github/workflows/pr-test.yml` matrix-tests the same 5 OS/arch combos × casclib + stormlib on every PR.
-
-Note: Windows arm64 is not in the matrix (node-gyp toolchain on `windows-11-arm` is still rough). Falls back to source build at install time.
+`.github/workflows/pr-test.yml` matrix-tests the same 6 OS/arch combos × casclib + stormlib on every PR.
 
 ## Files worth knowing
 
