@@ -105,11 +105,13 @@ stormlib tests use local MPQ fixtures under `packages/stormlib/test/files/`.
 
 - Input `tag` must match `^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` (e.g. `casclib/v1.0.0`, `stormlib/v0.0.0-dev.3`).
 - Input `npm_tag` is `latest` or `dev`.
-- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64), `macos-15-intel` (mac x64), `macos-latest` (mac arm64).
+- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64).
 - Publishes with `npm publish --provenance --access public --tag <npm_tag>` from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments on the 5 most recent merged PRs.
 - **Versions are not bumped manually** — let the workflow do it. Don't tag locally.
 
-`.github/workflows/pr-test.yml` matrix-tests the same 6 OS/arch combos × casclib + stormlib on every PR.
+`.github/workflows/pr-test.yml` matrix-tests the same 4 OS/arch combos × casclib + stormlib on every PR.
+
+**macOS not in CI.** Native code is fully macOS-compatible (binding.gyp mac branch + system zlib/bzip2 links) and source builds work on Xcode CLT. Online-storage tests fail in GitHub Actions macOS runners because Blizzard's CDN port 1119 is not reachable from those runners' egress, producing `CascError=ERROR_FILE_NOT_FOUND` from empty CSV responses. No prebuilds shipped for mac — falls back to source build at install. If you have local mac hardware, run `pnpm rebuild && pnpm test` to verify changes.
 
 ## Files worth knowing
 
