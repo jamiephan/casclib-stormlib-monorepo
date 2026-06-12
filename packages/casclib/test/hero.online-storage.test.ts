@@ -1,4 +1,4 @@
-import { Storage, File, withStorage } from "../lib";
+import { Storage, File, withStorage, CascError } from "../lib";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -256,6 +256,79 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
       it("readFileAsJson throws SyntaxError on non-JSON content", () => {
         expect(() => helperStorage.readFileAsJson(dataBuildId)).toThrow(SyntaxError);
       });
+
+      it("readFileAsStringAsync matches the sync variant", async () => {
+        const sync = helperStorage.readFileAsString(dataBuildId);
+        await expect(helperStorage.readFileAsStringAsync(dataBuildId)).resolves.toBe(sync);
+      });
+
+    });
+
+    describe("Storage.getFileSize", () => {
+      it("matches the size reported by getFileInfo", () => {
+        const size = helperStorage.getFileSize(dataBuildId);
+        expect(size).toBeGreaterThan(0);
+        expect(size).toBe(helperStorage.getFileInfo(dataBuildId)?.size);
+      });
+
+      it("throws CascError for missing files", () => {
+        expect(() => helperStorage.getFileSize("does/not/exist.xyz")).toThrow(CascError);
+      });
+    });
+
+    describe("Storage.getProductInfo", () => {
+      it("returns the product code name and build number", () => {
+        const info = helperStorage.getProductInfo();
+        expect(info.codeName).toBe("hero");
+        expect(info.buildNumber).toBeGreaterThan(0);
+      });
+    });
+
+    describe("Storage.findFilesMatching", () => {
+      it("returns only entries whose fileName matches the regex", () => {
+        // CASC find data normalizes file names to lowercase
+        const pattern = /databuildid\.txt$/i;
+        const matches = helperStorage.findFilesMatching(pattern);
+        expect(matches.length).toBeGreaterThan(0);
+        expect(matches.every(f => pattern.test(f.fileName))).toBe(true);
+        expect(matches.length).toBe(
+          helperStorage.findAllFiles("*DataBuildId.txt").length
+        );
+      });
+
+      it("returns an empty array when nothing matches", () => {
+        expect(helperStorage.findFilesMatching(/^no-such-file-anywhere$/)).toEqual([]);
+      });
+    });
+
+    describe("Storage.extractFiles / extractFilesAsync", () => {
+      it("extracts files matching a regex, preserving directory structure", () => {
+        const outDir = path.join(os.tmpdir(), `casclib_extractFiles_${Date.now()}`);
+        try {
+          const { extracted, failed } = helperStorage.extractFiles(outDir, /databuildid\.txt$/i);
+          expect(extracted.length).toBeGreaterThan(0);
+          expect(failed).toEqual([]);
+          for (const name of extracted) {
+            const onDisk = path.join(outDir, ...name.split(/[\\/]+/));
+            expect(fs.existsSync(onDisk)).toBe(true);
+          }
+        } finally {
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      });
+
+      it("accepts a CASC mask string and matches the sync regex variant", async () => {
+        const outDir = path.join(os.tmpdir(), `casclib_extractFilesAsync_${Date.now()}`);
+        try {
+          const result = await helperStorage.extractFilesAsync(outDir, "*DataBuildId.txt");
+          expect(result.extracted.length).toBeGreaterThan(0);
+          expect(result.failed).toEqual([]);
+          const onDisk = path.join(outDir, ...result.extracted[0].split(/[\\/]+/));
+          expect(fs.existsSync(onDisk)).toBe(true);
+        } finally {
+          fs.rmSync(outDir, { recursive: true, force: true });
+        }
+      });
     });
 
     describe("Storage.extractFile", () => {
@@ -310,6 +383,78 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
         const total = helperStorage.getTotalFileCount();
         expect(Number.isInteger(total)).toBe(true);
         expect(total).toBeGreaterThan(0);
+      });
+    });
+
+    describe("File 64-bit positioning and info", () => {
+      it("getSize64 / setPosition64 / getPosition64 work", () => {
+        const file = helperStorage.openFile(dataBuildId);
+        try {
+          const size = file.getSize64();
+          expect(size).toBe(file.getSize());
+
+          expect(file.setPosition64(2)).toBe(2);
+          expect(file.getPosition64()).toBe(2);
+          expect(file.getPosition()).toBe(2);
+        } finally {
+          file.close();
+        }
+      });
+
+      it("getFileInfo(FullInfo) reports the content size", () => {
+        const file = helperStorage.openFile(dataBuildId);
+        try {
+          const info = file.getFileInfo(2 /* CascFileInfoClass.FullInfo */);
+          expect(info).toBeDefined();
+          expect(info.contentSize).toBe(file.getSize64());
+        } finally {
+          file.close();
+        }
+      });
+    });
+
+    describe("Encryption keys", () => {
+      it("addEncryptionKey and findEncryptionKey round-trip", () => {
+        const keyName = 0x1122334455;
+        const key = Buffer.from("00112233445566778899AABBCCDDEEFF", "hex");
+        expect(helperStorage.addEncryptionKey(keyName, key)).toBe(true);
+        const found = helperStorage.findEncryptionKey(keyName);
+        expect(found).not.toBeNull();
+        expect(found!.equals(key)).toBe(true);
+      });
+
+      it("addStringEncryptionKey registers a hex-string key", () => {
+        expect(
+          helperStorage.addStringEncryptionKey(0x66778899, "FFEEDDCCBBAA99887766554433221100")
+        ).toBe(true);
+        expect(helperStorage.findEncryptionKey(0x66778899)?.length).toBe(16);
+      });
+
+      it("importKeysFromString imports a key list", () => {
+        const keyList = "00000000deadbeef 000102030405060708090A0B0C0D0E0F\n";
+        expect(helperStorage.importKeysFromString(keyList)).toBe(true);
+        const found = helperStorage.findEncryptionKey(0xdeadbeef);
+        expect(found!.equals(Buffer.from("000102030405060708090A0B0C0D0E0F", "hex"))).toBe(true);
+      });
+
+      it("importKeysFromFile imports a key file", () => {
+        const keyFile = path.join(os.tmpdir(), `casclib_keys_${Date.now()}.txt`);
+        fs.writeFileSync(keyFile, "00000000cafebabe 0F0E0D0C0B0A09080706050403020100\n");
+        try {
+          expect(helperStorage.importKeysFromFile(keyFile)).toBe(true);
+          expect(helperStorage.findEncryptionKey(0xcafebabe)?.length).toBe(16);
+        } finally {
+          fs.unlinkSync(keyFile);
+        }
+      });
+
+      it("findEncryptionKey returns null for an unknown key", () => {
+        expect(helperStorage.findEncryptionKey(0x424242424242)).toBeNull();
+      });
+
+      it("getNotFoundEncryptionKey returns a number or null", () => {
+        const value = helperStorage.getNotFoundEncryptionKey();
+        expect(value === null || typeof value === "number").toBe(true);
       });
     });
 
@@ -374,6 +519,82 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
         expect(f.readAll().length).toBeGreaterThan(0);
         (f as any)[(Symbol as any).dispose]();
         expect(f.close()).toBe(false);
+      });
+    });
+
+    describe("Modern API (factories, async, iterators, CascError)", () => {
+      const MODERN_TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_modern_hero";
+      const MODERN_CONN = `${MODERN_TEMP_DIR}*hero*us`;
+
+      afterAll(() => {
+        if (fs.existsSync(MODERN_TEMP_DIR)) {
+          try { fs.rmSync(MODERN_TEMP_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      });
+
+      it("Storage.openOnlineAsync factory opens without blocking and reads async", async () => {
+        const s = await Storage.openOnlineAsync(MODERN_CONN);
+        try {
+          expect(s.isOpen).toBe(true);
+          const buf = await s.readFileAsync(dataBuildId);
+          expect(Buffer.isBuffer(buf)).toBe(true);
+          expect(buf.toString("utf-8").startsWith("B")).toBe(true);
+        } finally {
+          s.close();
+        }
+        expect(s.isOpen).toBe(false);
+      }, 300_000); // opening an online storage downloads manifests from the CDN
+
+      it("Storage.openOnline factory returns an opened storage", () => {
+        // Reuses the cache populated by the async factory test above
+        const s = Storage.openOnline(MODERN_CONN);
+        try {
+          expect(s.isOpen).toBe(true);
+          expect(s.fileExists(dataBuildId)).toBe(true);
+        } finally {
+          s.close();
+        }
+        expect(s.isOpen).toBe(false);
+      });
+
+      it("File.readAllAsync matches sync readAll", async () => {
+        const sync = helperStorage.readFile(dataBuildId);
+        const file = helperStorage.openFile(dataBuildId);
+        try {
+          const async = await file.readAllAsync();
+          expect(async.equals(sync)).toBe(true);
+        } finally {
+          file.close();
+        }
+      });
+
+      it("files() generator lazily iterates and supports early break", () => {
+        const seen: string[] = [];
+        for (const entry of helperStorage.files("*.xml")) {
+          seen.push(entry.fileName);
+          if (seen.length >= 3) break;
+        }
+        expect(seen.length).toBe(3);
+        // The find handle must have been released — a fresh full scan still works
+        expect(helperStorage.findAllFiles("*.xml").length).toBeGreaterThanOrEqual(3);
+      });
+
+      it("sync open failure throws CascError with code and codeName", () => {
+        const s = new Storage();
+        try {
+          s.open("/non/existent/casc/storage");
+          fail("expected open() to throw");
+        } catch (err) {
+          expect(err).toBeInstanceOf(CascError);
+          expect(typeof (err as CascError).code).toBe("number");
+          expect((err as CascError).code).toBeGreaterThan(0);
+          expect(typeof (err as CascError).codeName).toBe("string");
+        }
+      });
+
+      it("async open failure rejects with CascError", async () => {
+        const s = new Storage();
+        await expect(s.openAsync("/non/existent/casc/storage")).rejects.toBeInstanceOf(CascError);
       });
     });
   });

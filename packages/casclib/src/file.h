@@ -13,10 +13,12 @@ public:
 
 private:
   static Napi::FunctionReference constructor;
+  friend class CascReadAllWorker;
 
   // Methods
   Napi::Value Read(const Napi::CallbackInfo& info);
   Napi::Value ReadAll(const Napi::CallbackInfo& info);
+  Napi::Value ReadAllAsync(const Napi::CallbackInfo& info);
   Napi::Value GetSize(const Napi::CallbackInfo& info);
   Napi::Value GetSize64(const Napi::CallbackInfo& info);
   Napi::Value GetPosition(const Napi::CallbackInfo& info);

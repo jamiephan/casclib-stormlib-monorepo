@@ -8,8 +8,11 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 - Extract files from classic Blizzard games
 - Create new archives and modify existing ones
 - File compression and encryption support
+- Promise-based async API — archive opening, reads, and extraction run on worker threads
+- Structured errors (`StormError` with numeric `code` and symbolic `codeName`)
+- Static factories (`Archive.open(...)`, `Archive.create(...)`) and file iteration (`for (const f of archive)`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage
@@ -63,13 +66,41 @@ const { Archive, File } = require('@jamiephan/stormlib');
 import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 ```
 
+### Quick start (modern API)
+
+```typescript
+import { Archive, StormError } from '@jamiephan/stormlib';
+
+// Static factories return an already-opened archive
+const archive = await Archive.openAsync('/path/to/war3map.w3x');
+
+try {
+  // Promise-based reads and extraction (off the event loop)
+  const script = await archive.readFileAsync('war3map.j');
+  await archive.extractFileAsync('war3map.j', '/tmp/war3map.j');
+
+  // Iterate files lazily
+  for (const entry of archive.files('*.txt')) {
+    console.log(entry.name, entry.fileSize);
+  }
+} catch (err) {
+  if (err instanceof StormError) {
+    // Structured error info from SErrGetLastError()
+    console.error(err.code, err.codeName, err.message);
+  }
+  throw err;
+} finally {
+  archive.close();
+}
+```
+
 ### Opening an MPQ Archive
 
 ```typescript
 import { Archive } from '@jamiephan/stormlib';
 
-const archive = new Archive();
-archive.open('/path/to/archive.mpq');
+const archive = Archive.open('/path/to/archive.mpq');
+// (the instance API still works: const archive = new Archive(); archive.open(...))
 
 // Check if a file exists
 if (archive.hasFile('war3map.j')) {
@@ -116,6 +147,10 @@ archive.create('/path/to/new-archive.mpq', {
 // Add a file from disk
 archive.addFile('/path/to/local-file.txt', 'archive-file.txt');
 
+// Add in-memory data directly — no temp file needed
+archive.addBuffer('data/blob.bin', Buffer.from([1, 2, 3]));
+archive.addString('readme.txt', 'Hello, MPQ!');
+
 // Rename a file
 archive.renameFile('old-name.txt', 'new-name.txt');
 
@@ -136,7 +171,7 @@ const archive = new Archive();
 archive.open('/path/to/game.mpq');
 
 // Extract a file to disk
-const success = archive.extractFile('Scripts\\main.lua', '/output/main.lua');
+const success = archive.extractFile('Data\\main.xml', '/output/main.xml');
 if (success) {
   console.log('File extracted successfully!');
 }
@@ -295,9 +330,9 @@ import * as path from 'path';
 const archive = new Archive();
 archive.open('/path/to/game.mpq');
 
-// Extract all Lua scripts
-const extracted = archive.extractAllFiles('/output/scripts', '*.lua');
-console.log(`Extracted ${extracted} Lua files`);
+// Extract all XML files, preserving directory structure
+const { extracted, failed } = archive.extractFiles('/output/data', '*.xml');
+console.log(`Extracted ${extracted.length} XML files (${failed.length} failed)`);
 
 // Read configuration as JSON
 try {
@@ -566,6 +601,15 @@ allFiles?.forEach(file => {
 });
 ```
 
+##### `findFilesMatching(pattern: RegExp): FileInfo[]`
+Finds all files whose name matches a regular expression. Enumerates the whole archive and filters client-side — for simple wildcard patterns, prefer `findFiles(mask)`, which filters natively.
+
+**Example:**
+```typescript
+const scripts = archive.findFilesMatching(/\.xml$/i);
+console.log(`Found ${scripts.length} files matching pattern`);
+```
+
 ##### `listFiles(): FileInfo[]`
 Lists all files in the archive.
 
@@ -674,12 +718,12 @@ Sets the locale for archive operations.
 **Parameters:**
 - `locale`: Locale ID to set
 
-**Returns:** Previous locale ID
+**Returns:** The locale ID now in effect
 
 **Example:**
 ```typescript
 import { LANG_NEUTRAL } from '@jamiephan/stormlib';
-const oldLocale = Archive.setLocale(LANG_NEUTRAL);
+Archive.setLocale(LANG_NEUTRAL);
 ```
 
 #### File Operations
@@ -989,7 +1033,7 @@ Reads a file from the archive as a string.
 const archive = new Archive();
 archive.open('/path/to/archive.mpq');
 
-const content = archive.readFileAsString('script.lua');
+const content = archive.readFileAsString('script.xml');
 console.log(content);
 ```
 
@@ -1012,22 +1056,92 @@ const config = archive.readFileAsJson<Config>('config.json');
 console.log(`Version: ${config.version}`);
 ```
 
-##### `extractAllFiles(outputDir: string, mask?: string): number`
-Extracts all files matching a mask to a directory.
+##### `readFileAsStringAsync(filename: string, encoding?: BufferEncoding): Promise<string>`
+Reads a file from the archive as a string on a worker thread (does not block the event loop).
 
 **Parameters:**
-- `outputDir`: Output directory path
-- `mask`: File mask to filter (default: "*")
+- `filename`: Name of the file to read
+- `encoding`: Text encoding (default: 'utf-8')
 
-**Returns:** Number of files extracted
+**Returns:** Promise resolving to the file content as string
 
 **Example:**
 ```typescript
-const extracted = archive.extractAllFiles('/output/dir');
-console.log(`Extracted ${extracted} files`);
+const content = await archive.readFileAsStringAsync('script.xml');
+```
 
-// Extract only .j files
-const jFiles = archive.extractAllFiles('/output/dir', '*.j');
+##### `addBuffer(archiveName: string, data: Buffer, options?: AddBufferOptions): boolean`
+Adds in-memory data to the archive as a file. Wraps the `createFile` → `write` → `finish` sequence so no temp file on disk is needed.
+
+**Parameters:**
+- `archiveName`: Name for the file in the archive
+- `data`: File contents
+- `options`: Optional settings:
+  - `flags`: File flags (default: `MPQ_FILE_COMPRESS | MPQ_FILE_REPLACEEXISTING`)
+  - `compression`: Compression method (default: `MPQ_COMPRESSION_ZLIB`)
+  - `fileTime`: File timestamp (default: 0)
+  - `locale`: Locale ID (default: 0)
+
+**Returns:** `true` if successful
+
+**Example:**
+```typescript
+archive.addBuffer('data/blob.bin', Buffer.from([1, 2, 3]));
+```
+
+##### `addString(archiveName: string, text: string, options?: AddBufferOptions & { encoding?: BufferEncoding }): boolean`
+Adds a string to the archive as a file.
+
+**Parameters:**
+- `archiveName`: Name for the file in the archive
+- `text`: File contents
+- `options`: Same as `addBuffer`, plus `encoding` (default: 'utf-8')
+
+**Returns:** `true` if successful
+
+**Example:**
+```typescript
+archive.addString('readme.txt', 'Hello, MPQ!');
+```
+
+##### `extractFiles(outputDir: string, pattern?: string | RegExp): { extracted: string[]; failed: string[] }`
+Extracts every file matching an MPQ mask (string) or regular expression to a directory, preserving the archive's directory structure (subdirectories are created as needed). Files that cannot be extracted are skipped and reported in `failed`.
+
+**Parameters:**
+- `outputDir`: Output directory
+- `pattern`: Mask like `'*.txt'` or a RegExp tested against the file name (default: all files)
+
+**Returns:** Object with the file names that were `extracted` and the ones that `failed`
+
+**Example:**
+```typescript
+const { extracted, failed } = archive.extractFiles('/output/dir', /\.xml$/i);
+console.log(`Extracted ${extracted.length} files (${failed.length} failed)`);
+
+// Extract only .j files using a native mask
+const result = archive.extractFiles('/output/dir', '*.j');
+```
+
+##### `extractFilesAsync(outputDir: string, pattern?: string | RegExp): Promise<{ extracted: string[]; failed: string[] }>`
+Like `extractFiles`, but reads and writes on a worker thread without blocking the event loop. Files are extracted sequentially — MPQ handles must not run concurrent operations.
+
+**Example:**
+```typescript
+const { extracted } = await archive.extractFilesAsync('/output/dir', '*.xml');
+```
+
+##### `getFileCount(mask?: string): number`
+Gets the number of files in the archive matching a mask.
+
+**Parameters:**
+- `mask`: File mask to filter (default: "*")
+
+**Returns:** Number of matching files
+
+**Example:**
+```typescript
+const total = archive.getFileCount();
+const scripts = archive.getFileCount('*.xml');
 ```
 
 ##### `getFileNames(mask?: string): string[]`
@@ -1041,7 +1155,7 @@ Gets all file names in the archive.
 **Example:**
 ```typescript
 const allFiles = archive.getFileNames();
-const scripts = archive.getFileNames('*.lua');
+const scripts = archive.getFileNames('*.xml');
 ```
 
 ##### `canOpenFile(filename: string): boolean`

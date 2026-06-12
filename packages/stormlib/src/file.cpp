@@ -4,12 +4,57 @@
 
 Napi::FunctionReference MpqFile::constructor;
 
+// Reads the remaining file contents on a worker thread so large or highly
+// compressed files do not block the event loop. The receiver keeps the JS
+// File object (and thus the native handle) alive while the worker runs.
+class MpqReadAllWorker : public Napi::AsyncWorker {
+public:
+  MpqReadAllWorker(Napi::Env env, Napi::Object receiver, MpqFile* file)
+    : Napi::AsyncWorker(env, "stormlib:readAllAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      file(file), bytesRead(0), errorCode(0) {}
+
+  void Execute() override {
+    DWORD fileSize = SFileGetFileSize(file->hFile, nullptr);
+    if (fileSize == 0 || fileSize == SFILE_INVALID_SIZE) {
+      return;
+    }
+    buffer.resize(fileSize);
+    if (!SFileReadFile(file->hFile, buffer.data(), fileSize, &bytesRead, nullptr)) {
+      errorCode = SErrGetLastError();
+      SetError("Failed to read file");
+    }
+  }
+
+  void OnOK() override {
+    deferred.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), buffer.data(), bytesRead));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (StormError=" + std::to_string(errorCode) +
+                          " " + StormErrorName(errorCode) + ")";
+    deferred.Reject(MakeStormError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  MpqFile* file;
+  std::vector<uint8_t> buffer;
+  DWORD bytesRead;
+  DWORD errorCode;
+};
+
 Napi::Object MpqFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "File", {
     InstanceMethod("SFileReadFile", &MpqFile::Read),
     InstanceMethod("readFileAll", &MpqFile::ReadAll),
+    InstanceMethod("readAllAsync", &MpqFile::ReadAllAsync),
     InstanceMethod("SFileWriteFile", &MpqFile::Write),
     InstanceMethod("SFileFinishFile", &MpqFile::Finish),
     InstanceMethod("SFileGetFileSize", &MpqFile::GetSize),
@@ -67,8 +112,7 @@ Napi::Value MpqFile::Read(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!SFileReadFile(hFile, buffer.data(), bytesToRead, &bytesRead, nullptr)) {
-    Napi::Error::New(env, "Failed to read file" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to read file");
     return env.Null();
   }
 
@@ -94,12 +138,26 @@ Napi::Value MpqFile::ReadAll(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!SFileReadFile(hFile, buffer.data(), fileSize, &bytesRead, nullptr)) {
-    Napi::Error::New(env, "Failed to read file" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to read file");
     return env.Null();
   }
 
   return Napi::Buffer<uint8_t>::Copy(env, buffer.data(), bytesRead);
+}
+
+Napi::Value MpqFile::ReadAllAsync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  auto* worker = new MpqReadAllWorker(env, info.This().As<Napi::Object>(), this);
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
 }
 
 Napi::Value MpqFile::GetSize(const Napi::CallbackInfo& info) {
@@ -190,8 +248,7 @@ Napi::Value MpqFile::Write(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileWriteFile(hFile, buffer.Data(), buffer.Length(), compression)) {
-    Napi::Error::New(env, "Failed to write to file" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to write to file");
     return env.Null();
   }
 
@@ -208,8 +265,7 @@ Napi::Value MpqFile::Finish(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileFinishFile(hFile)) {
-    Napi::Error::New(env, "Failed to finish file" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to finish file");
     return env.Null();
   }
 
@@ -231,8 +287,7 @@ Napi::Value MpqFile::GetFileName(const Napi::CallbackInfo& info) {
 
   char filename[MAX_PATH];
   if (!SFileGetFileName(hFile, filename)) {
-    Napi::Error::New(env, "Failed to get file name" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to get file name");
     return env.Null();
   }
 
@@ -257,8 +312,7 @@ Napi::Value MpqFile::SetLocale(const Napi::CallbackInfo& info) {
   LCID newLocale = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetFileLocale(hFile, newLocale)) {
-    Napi::Error::New(env, "Failed to set file locale" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to set file locale");
     return env.Null();
   }
 
@@ -293,8 +347,7 @@ Napi::Value MpqFile::GetFileInfo(const Napi::CallbackInfo& info) {
   // Allocate buffer and get info
   std::vector<uint8_t> buffer(lengthNeeded);
   if (!SFileGetFileInfo(hFile, infoClass, buffer.data(), lengthNeeded, nullptr)) {
-    Napi::Error::New(env, "Failed to get file info" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to get file info");
     return env.Null();
   }
 

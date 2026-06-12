@@ -5,11 +5,95 @@
 
 Napi::FunctionReference MpqArchive::constructor;
 
+// Opens an MPQ archive off the event loop. The receiver reference keeps the
+// JS Archive object alive while the worker runs.
+class OpenArchiveWorker : public Napi::AsyncWorker {
+public:
+  OpenArchiveWorker(Napi::Env env, Napi::Object receiver, MpqArchive* archive,
+                    std::string path, DWORD flags)
+    : Napi::AsyncWorker(env, "stormlib:openAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      archive(archive), path(std::move(path)), flags(flags),
+      hMpq(nullptr), errorCode(0) {}
+
+  void Execute() override {
+    if (!SFileOpenArchive(path.c_str(), 0, flags, &hMpq)) {
+      errorCode = SErrGetLastError();
+      SetError("Failed to open MPQ archive: " + path);
+    }
+  }
+
+  void OnOK() override {
+    archive->hMpq = hMpq;
+    archive->isOpen = true;
+    deferred.Resolve(Napi::Boolean::New(Env(), true));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (StormError=" + std::to_string(errorCode) +
+                          " " + StormErrorName(errorCode) + ")";
+    deferred.Reject(MakeStormError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  MpqArchive* archive;
+  std::string path;
+  DWORD flags;
+  HANDLE hMpq;
+  DWORD errorCode;
+};
+
+// Extracts a file from the archive to disk off the event loop.
+class ExtractFileWorker : public Napi::AsyncWorker {
+public:
+  ExtractFileWorker(Napi::Env env, Napi::Object receiver, MpqArchive* archive,
+                    std::string source, std::string dest)
+    : Napi::AsyncWorker(env, "stormlib:extractFileAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      archive(archive), source(std::move(source)), dest(std::move(dest)),
+      errorCode(0) {}
+
+  void Execute() override {
+    if (!SFileExtractFile(archive->hMpq, source.c_str(), dest.c_str(), 0)) {
+      errorCode = SErrGetLastError();
+      SetError("Failed to extract file: " + source);
+    }
+  }
+
+  void OnOK() override {
+    deferred.Resolve(Napi::Boolean::New(Env(), true));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (StormError=" + std::to_string(errorCode) +
+                          " " + StormErrorName(errorCode) + ")";
+    deferred.Reject(MakeStormError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  MpqArchive* archive;
+  std::string source;
+  std::string dest;
+  DWORD errorCode;
+};
+
 Napi::Object MpqArchive::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Archive", {
     InstanceMethod("SFileOpenArchive", &MpqArchive::Open),
+    InstanceMethod("openAsync", &MpqArchive::OpenAsync),
+    InstanceMethod("extractFileAsync", &MpqArchive::ExtractFileAsync),
     InstanceMethod("SFileCreateArchive", &MpqArchive::Create),
     InstanceMethod("SFileCloseArchive", &MpqArchive::Close),
     InstanceMethod("SFileFlushArchive", &MpqArchive::Flush),
@@ -90,13 +174,40 @@ Napi::Value MpqArchive::Open(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileOpenArchive(path.c_str(), 0, flags, &hMpq)) {
-    std::string error = "Failed to open MPQ archive: " + path + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to open MPQ archive: " + path);
     return env.Null();
   }
 
   isOpen = true;
   return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::OpenAsync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    Napi::TypeError::New(env, "Expected archive path as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  if (isOpen) {
+    Napi::Error::New(env, "Archive is already open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  std::string path = info[0].As<Napi::String>().Utf8Value();
+  DWORD flags = 0;
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    flags = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  auto* worker = new OpenArchiveWorker(env, info.This().As<Napi::Object>(), this,
+                                       std::move(path), flags);
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
 }
 
 Napi::Value MpqArchive::Create(const Napi::CallbackInfo& info) {
@@ -127,8 +238,7 @@ Napi::Value MpqArchive::Create(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileCreateArchive(path.c_str(), flags, maxFileCount, &hMpq)) {
-    std::string error = "Failed to create MPQ archive: " + path + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to create MPQ archive: " + path);
     return env.Null();
   }
 
@@ -176,8 +286,7 @@ Napi::Value MpqArchive::OpenFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!SFileOpenFileEx(hMpq, filename.c_str(), flags, &hFile)) {
-    std::string error = "Failed to open file: " + filename + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to open file: " + filename);
     return env.Null();
   }
 
@@ -226,12 +335,36 @@ Napi::Value MpqArchive::ExtractFile(const Napi::CallbackInfo& info) {
   std::string dest = info[1].As<Napi::String>().Utf8Value();
 
   if (!SFileExtractFile(hMpq, source.c_str(), dest.c_str(), 0)) {
-    std::string error = "Failed to extract file: " + source + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to extract file: " + source);
     return env.Null();
   }
 
   return Napi::Boolean::New(env, true);
+}
+
+Napi::Value MpqArchive::ExtractFileAsync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
+    Napi::TypeError::New(env, "Expected source and destination paths")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  std::string source = info[0].As<Napi::String>().Utf8Value();
+  std::string dest = info[1].As<Napi::String>().Utf8Value();
+
+  auto* worker = new ExtractFileWorker(env, info.This().As<Napi::Object>(), this,
+                                       std::move(source), std::move(dest));
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
 }
 
 Napi::Value MpqArchive::AddFile(const Napi::CallbackInfo& info) {
@@ -258,8 +391,7 @@ Napi::Value MpqArchive::AddFile(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddFileEx(hMpq, source.c_str(), archiveName.c_str(), flags, MPQ_COMPRESSION_ZLIB, MPQ_COMPRESSION_ZLIB)) {
-    std::string error = "Failed to add file: " + source + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to add file: " + source);
     return env.Null();
   }
 
@@ -284,8 +416,7 @@ Napi::Value MpqArchive::RemoveFile(const Napi::CallbackInfo& info) {
   std::string filename = info[0].As<Napi::String>().Utf8Value();
 
   if (!SFileRemoveFile(hMpq, filename.c_str(), 0)) {
-    std::string error = "Failed to remove file: " + filename + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to remove file: " + filename);
     return env.Null();
   }
 
@@ -311,8 +442,7 @@ Napi::Value MpqArchive::RenameFile(const Napi::CallbackInfo& info) {
   std::string newName = info[1].As<Napi::String>().Utf8Value();
 
   if (!SFileRenameFile(hMpq, oldName.c_str(), newName.c_str())) {
-    std::string error = "Failed to rename file: " + oldName + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to rename file: " + oldName);
     return env.Null();
   }
 
@@ -329,8 +459,7 @@ Napi::Value MpqArchive::Compact(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileCompactArchive(hMpq, nullptr, 0)) {
-    Napi::Error::New(env, "Failed to compact archive" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to compact archive");
     return env.Null();
   }
 
@@ -362,8 +491,7 @@ Napi::Value MpqArchive::Flush(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileFlushArchive(hMpq)) {
-    Napi::Error::New(env, "Failed to flush archive" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to flush archive");
     return env.Null();
   }
 
@@ -388,8 +516,7 @@ Napi::Value MpqArchive::SetMaxFileCount(const Napi::CallbackInfo& info) {
   DWORD maxFileCount = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetMaxFileCount(hMpq, maxFileCount)) {
-    Napi::Error::New(env, "Failed to set max file count" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to set max file count");
     return env.Null();
   }
 
@@ -427,8 +554,7 @@ Napi::Value MpqArchive::SetAttributes(const Napi::CallbackInfo& info) {
   DWORD attributes = info[0].As<Napi::Number>().Uint32Value();
 
   if (!SFileSetAttributes(hMpq, attributes)) {
-    Napi::Error::New(env, "Failed to set attributes" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to set attributes");
     return env.Null();
   }
 
@@ -469,8 +595,7 @@ Napi::Value MpqArchive::AddFileEx(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddFileEx(hMpq, source.c_str(), archiveName.c_str(), flags, compression, compressionNext)) {
-    std::string error = "Failed to add file: " + source + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to add file: " + source);
     return env.Null();
   }
 
@@ -551,8 +676,7 @@ Napi::Value MpqArchive::SignArchive(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileSignArchive(hMpq, signatureType)) {
-    Napi::Error::New(env, "Failed to sign archive" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to sign archive");
     return env.Null();
   }
 
@@ -579,8 +703,7 @@ Napi::Value MpqArchive::GetFileChecksums(const Napi::CallbackInfo& info) {
   char md5[33] = {0}; // 32 chars + null terminator
 
   if (!SFileGetFileChecksums(hMpq, filename.c_str(), &crc32, md5)) {
-    Napi::Error::New(env, "Failed to get file checksums" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to get file checksums");
     return env.Null();
   }
 
@@ -641,8 +764,7 @@ Napi::Value MpqArchive::OpenPatchArchive(const Napi::CallbackInfo& info) {
   if (!SFileOpenPatchArchive(hMpq, patchPath.c_str(), 
                              patchPrefix.empty() ? nullptr : patchPrefix.c_str(), 
                              flags)) {
-    Napi::Error::New(env, "Failed to open patch archive" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to open patch archive");
     return env.Null();
   }
 
@@ -733,8 +855,7 @@ Napi::Value MpqArchive::EnumLocales(const Napi::CallbackInfo& info) {
   DWORD result = SFileEnumLocales(hMpq, filename.c_str(), locales, &maxLocales, searchScope);
   
   if (result != ERROR_SUCCESS) {
-    Napi::Error::New(env, "Failed to enumerate locales" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to enumerate locales");
     return env.Null();
   }
 
@@ -777,8 +898,7 @@ Napi::Value MpqArchive::CreateFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!SFileCreateFile(hMpq, filename.c_str(), fileTime, fileSize, locale, flags, &hFile)) {
-    Napi::Error::New(env, "Failed to create file in archive" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to create file in archive");
     return env.Null();
   }
 
@@ -816,8 +936,7 @@ Napi::Value MpqArchive::AddWave(const Napi::CallbackInfo& info) {
   }
 
   if (!SFileAddWave(hMpq, source.c_str(), archiveName.c_str(), flags, quality)) {
-    std::string error = "Failed to add wave file: " + source + FormatStormError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to add wave file: " + source);
     return env.Null();
   }
 
@@ -842,8 +961,7 @@ Napi::Value MpqArchive::UpdateFileAttributes(const Napi::CallbackInfo& info) {
   std::string filename = info[0].As<Napi::String>().Utf8Value();
 
   if (!SFileUpdateFileAttributes(hMpq, filename.c_str())) {
-    Napi::Error::New(env, "Failed to update file attributes" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to update file attributes");
     return env.Null();
   }
 
@@ -878,8 +996,7 @@ Napi::Value MpqArchive::GetFileInfo(const Napi::CallbackInfo& info) {
   // Allocate buffer and get info
   std::vector<uint8_t> buffer(lengthNeeded);
   if (!SFileGetFileInfo(hMpq, infoClass, buffer.data(), lengthNeeded, nullptr)) {
-    Napi::Error::New(env, "Failed to get file info" + FormatStormError())
-      .ThrowAsJavaScriptException();
+    ThrowStormError(env, "Failed to get file info");
     return env.Null();
   }
 

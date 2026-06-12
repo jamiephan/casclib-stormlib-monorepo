@@ -6,8 +6,11 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 
 - Read CASC storage archives (local and online)
 - Extract files from modern Blizzard games
+- Promise-based async API — storage opening and file reads run on worker threads, never blocking the event loop
+- Structured errors (`CascError` with numeric `code` and symbolic `codeName`)
+- Static factories (`Storage.open(...)`) and lazy file iteration (`for (const f of storage.files('*.xml'))`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage
@@ -70,13 +73,43 @@ import {
 } from '@jamiephan/casclib';
 ```
 
+### Quick start (modern API)
+
+```typescript
+import { Storage, CascError } from '@jamiephan/casclib';
+
+// Static factories return an already-opened storage.
+// Async variants run on a worker thread — opening an online storage can
+// take minutes (CDN downloads), so never use the sync variant in a server.
+const storage = await Storage.openOnlineAsync('/tmp/casc-cache*hero*us');
+
+try {
+  // Promise-based file read (decompression/downloads off the event loop)
+  const buf = await storage.readFileAsync('mods/core.stormmod/base.stormdata/DataBuildId.txt');
+  console.log(buf.toString('utf-8'));
+
+  // Lazy iteration — the native find handle is released even on early break
+  for (const entry of storage.files('*.xml')) {
+    console.log(entry.fileName, entry.fileSize);
+  }
+} catch (err) {
+  if (err instanceof CascError) {
+    // Structured error info from GetCascError()
+    console.error(err.code, err.codeName, err.message);
+  }
+  throw err;
+} finally {
+  storage.close();
+}
+```
+
 ### Opening a CASC Storage
 
 ```typescript
 import { Storage } from '@jamiephan/casclib';
 
-const storage = new Storage();
-storage.open('/path/to/heroes/HeroesData');
+const storage = Storage.open('/path/to/heroes/HeroesData');
+// (the instance API still works: const storage = new Storage(); storage.open(...))
 
 // Check if a file exists
 if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml')) {
@@ -317,6 +350,23 @@ Gets storage information.
 
 **Returns:** Storage information object
 
+##### `getTotalFileCount(): number`
+Gets the total number of files in the storage. Convenience wrapper over `getStorageInfo`.
+
+**Example:**
+```typescript
+console.log(`Storage contains ${storage.getTotalFileCount()} files`);
+```
+
+##### `getProductInfo(): { codeName: string; buildNumber: number }`
+Gets the product code name and build number of the storage. Convenience wrapper over `getStorageInfo`.
+
+**Example:**
+```typescript
+const { codeName, buildNumber } = storage.getProductInfo();
+// { codeName: 'hero', buildNumber: 93571 }
+```
+
 #### File Operations
 
 ##### `openFile(filename: string, options?: FileOpenOptions): File`
@@ -373,13 +423,67 @@ if (info) {
 }
 ```
 
+##### `getFileSize(filename: string): number`
+Gets the size of a file without reading its contents. Throws `CascError` if the file does not exist.
+
+**Example:**
+```typescript
+const size = storage.getFileSize('some-file.txt');
+```
+
+#### Reading & Extracting
+
+##### `readFile(filename: string, options?: FileOpenOptions): Buffer`
+Reads a whole file from storage. Opens and closes the file internally.
+
+##### `readFileAsync(filename: string, options?: FileOpenOptions): Promise<Buffer>`
+Like `readFile`, but the read runs on a worker thread (does not block the event loop).
+
+##### `readFileAsString(filename: string, encoding?: BufferEncoding): string`
+Reads a file from storage as a string (default encoding: 'utf-8').
+
+##### `readFileAsStringAsync(filename: string, encoding?: BufferEncoding): Promise<string>`
+Like `readFileAsString`, but the read runs on a worker thread.
+
+##### `readFileAsJson<T>(filename: string): T`
+Reads a file from storage and parses it as JSON.
+
+**Example:**
+```typescript
+const buildId = storage.readFileAsString('mods/core.stormmod/base.stormdata/DataBuildId.txt');
+```
+
+##### `extractFile(filename: string, destination: string): number`
+Extracts a file from storage to a path on disk. Returns the number of bytes written.
+
+##### `extractFileAsync(filename: string, destination: string): Promise<number>`
+Like `extractFile`, but reads and writes without blocking the event loop.
+
+##### `extractFiles(outputDir: string, pattern?: string | RegExp): { extracted: string[]; failed: string[] }`
+Extracts every file matching a CASC mask (string) or regular expression to a directory, preserving the storage's directory structure (subdirectories are created as needed). Files that cannot be extracted (e.g. encrypted without keys) are skipped and reported in `failed`.
+
+**Parameters:**
+- `outputDir`: Output directory
+- `pattern`: CASC mask like `'*.txt'` or a RegExp tested against `fileName` (default: all files)
+
+**Returns:** Object with the file names that were `extracted` and the ones that `failed`
+
+**Example:**
+```typescript
+const { extracted, failed } = storage.extractFiles('./out', /\.xml$/i);
+console.log(`Extracted ${extracted.length} files (${failed.length} failed)`);
+```
+
+##### `extractFilesAsync(outputDir: string, pattern?: string | RegExp): Promise<{ extracted: string[]; failed: string[] }>`
+Like `extractFiles`, but reads and writes on worker threads without blocking the event loop. Files are extracted sequentially — a storage handle must not run concurrent operations.
+
 #### File Finding
 
 ##### `findFirstFile(mask?: string, listFile?: string): CascFindData | null`
 Finds the first file matching the mask.
 
 **Parameters:**
-- `mask`: File mask pattern (e.g., `*.lua`, `Interface\\*`)
+- `mask`: File mask pattern (e.g., `*.xml`, `Interface\\*`)
 - `listFile`: Optional list file path
 
 **Returns:** Find data object or `null` if no files found
@@ -414,6 +518,25 @@ Closes the current find operation.
 **Example:**
 ```typescript
 storage.findClose();
+```
+
+##### `findAllFiles(mask?: string, listFile?: string): CascFindData[]`
+Finds all files matching a mask, returning an array. Wraps the stateful `findFirstFile`/`findNextFile`/`findClose` loop so you don't have to write it yourself.
+
+**Example:**
+```typescript
+const allFiles = storage.findAllFiles();
+const xmlFiles = storage.findAllFiles('*.xml');
+console.log(`Found ${xmlFiles.length}/${allFiles.length} files`);
+```
+
+##### `findFilesMatching(pattern: RegExp, listFile?: string): CascFindData[]`
+Finds all files whose `fileName` matches a regular expression. Enumerates the whole storage and filters client-side — for simple wildcard patterns, prefer `findAllFiles(mask)`, which filters natively.
+
+**Example:**
+```typescript
+const maps = storage.findFilesMatching(/\.stormmap$/i);
+console.log(`Found ${maps.length} files matching pattern`);
 ```
 
 #### Encryption Key Management

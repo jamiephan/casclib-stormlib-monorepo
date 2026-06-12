@@ -1,10 +1,10 @@
-name: Create Tag and Publish Package
+name: Release
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v1.0.0 or stormlib/v0.0.0-dev.3)'
+        description: 'Tag name (e.g., casclib/v1.0.0 or stormlib/v0.0.0-dev.3)'
         required: true
         type: string
       npm_tag:
@@ -15,132 +15,149 @@ on:
           - latest
           - dev
         default: latest
+      dry_run:
+        description: 'Dry run: build everything and pack the tarball, but do not publish, commit, tag, or release'
+        required: false
+        type: boolean
+        default: false
 
+# Default to read-only; the publish job elevates only what it needs.
 permissions:
-  contents: write
-  id-token: write  # Required for npm provenance
+  contents: read
 
 concurrency:
   group: release
   cancel-in-progress: false
 
+env:
+  NODE_VERSION: 24
+
 jobs:
   validate:
     name: Validate Tag and Prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Only allow running on master branch
     if: github.ref == 'refs/heads/master'
     outputs:
       package: ${{ steps.parse.outputs.package }}
       version: ${{ steps.parse.outputs.version }}
       is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0  # Fetch all history for proper tagging
-          ref: master
-          submodules: recursive  # Include third-party submodules
-      
-      - name: Validate tag format
+
+      - name: Validate tag format and npm tag consistency
         shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          NPM_TAG: ${{ inputs.npm_tag }}
         run: |
-          TAG="${{ inputs.tag }}"
           echo "Validating tag: $TAG"
-          
+
           # Validate tag format (casclib/v* or stormlib/v*)
           if [[ ! "$TAG" =~ ^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
-            echo "Error: Tag must be in format 'casclib/vX.Y.Z' or 'stormlib/vX.Y.Z'"
+            echo "::error::Tag must be in format 'casclib/vX.Y.Z' or 'stormlib/vX.Y.Z'"
             echo "Examples: casclib/v1.0.0, stormlib/v2.1.0-beta.1"
             exit 1
           fi
-          
-          echo "Tag format validation passed"
-      
+
+          VERSION="${TAG#*/v}"
+
+          # Prerelease versions must not be published as `latest`, and vice versa —
+          # publishing a prerelease to `latest` would push it to every `npm install`.
+          if [[ "$VERSION" =~ [+-] ]]; then
+            if [[ "$NPM_TAG" == "latest" ]]; then
+              echo "::error::Prerelease version $VERSION cannot be published with npm tag 'latest'. Use 'dev'."
+              exit 1
+            fi
+          else
+            if [[ "$NPM_TAG" != "latest" ]]; then
+              echo "::error::Stable version $VERSION must be published with npm tag 'latest', not '$NPM_TAG'."
+              exit 1
+            fi
+          fi
+
+          echo "✓ Tag format and npm tag validation passed"
+
       - name: Check if tag already exists
         shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          TAG="${{ inputs.tag }}"
-          
           echo "Checking if tag $TAG already exists..."
-          
-          # Fetch all tags from remote
-          git fetch --tags
-          
-          # Check if tag exists locally or remotely
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "❌ Error: Tag $TAG already exists locally"
-            exit 1
-          fi
-          
+
           if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
-            echo "❌ Error: Tag $TAG already exists on remote"
+            echo "::error::Tag $TAG already exists on remote"
             exit 1
           fi
-          
+
           echo "✓ Tag $TAG does not exist, safe to create"
-      
+
       - name: Parse tag components
         id: parse
         shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
-          TAG="${{ inputs.tag }}"
-          
           # Extract package name (casclib or stormlib)
-          PACKAGE=$(echo "$TAG" | cut -d'/' -f1)
-          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
-          
+          PACKAGE="${TAG%%/*}"
+          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
+
           # Extract version (remove 'v' prefix)
-          VERSION=$(echo "$TAG" | cut -d'/' -f2 | sed 's/^v//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
+          VERSION="${TAG#*/v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
           # Detect if prerelease (contains - or +)
           if [[ "$VERSION" =~ [+-] ]]; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-            echo "Prerelease: true"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-            echo "Prerelease: false"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
-          
+
           echo "Package: $PACKAGE"
           echo "Version: $VERSION"
-      
+
       - name: Summary
         shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          NPM_TAG: ${{ inputs.npm_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          TAG="${{ inputs.tag }}"
-          NPM_TAG="${{ inputs.npm_tag }}"
-          echo "### ✓ Validation Passed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
-          echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Package build will now begin. Tag will be created after successful npm publish." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### ✓ Validation Passed"
+            echo ""
+            echo "**Tag:** \`$TAG\`"
+            echo "**NPM Tag:** \`$NPM_TAG\`"
+            echo "**Dry run:** \`$DRY_RUN\`"
+            echo ""
+            echo "Package build will now begin. Tag will be created after successful npm publish."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  # Build prebuilds for all platforms and Node versions
+  # Build prebuilds for all supported platforms
   build:
-    name: Build ${{ matrix.os }} (${{ matrix.arch }}) - Node ${{ matrix.node }}
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
     needs: validate
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             arch: x64
-            node: 22
           - os: ubuntu-24.04-arm
             arch: arm64
-            node: 22
           - os: windows-latest
             arch: x64
-            node: 22
           - os: windows-11-arm
             arch: arm64
-            node: 22
-
-    runs-on: ${{ matrix.os }}
+          - os: macos-15-intel
+            arch: x64
+          - os: macos-15
+            arch: arm64
 
     steps:
       - name: Checkout code
@@ -149,39 +166,17 @@ jobs:
           ref: master
           submodules: recursive
 
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node }}
-          registry-url: 'https://registry.npmjs.org'
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 10.33.4
 
-      - name: Update package.json version (temporary)
-        shell: bash
-        run: |
-          PACKAGE="${{ needs.validate.outputs.package }}"
-          VERSION="${{ needs.validate.outputs.version }}"
-          PACKAGE_JSON="packages/$PACKAGE/package.json"
-          
-          echo "Temporarily updating $PACKAGE_JSON to version $VERSION for build"
-          
-          # Update version in package.json using node
-          node -e "
-            const fs = require('fs');
-            const path = '$PACKAGE_JSON';
-            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-            pkg.version = '$VERSION';
-            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-          "
-          
-          echo "✓ Updated package.json version to $VERSION (not committed)"
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build TypeScript
         working-directory: packages/${{ needs.validate.outputs.package }}
@@ -200,27 +195,29 @@ jobs:
       - name: Upload prebuild
         uses: actions/upload-artifact@v5
         with:
-          name: prebuilds-${{ runner.os }}-${{ matrix.arch }}-node${{ matrix.node }}
+          name: prebuilds-${{ runner.os }}-${{ matrix.arch }}
           path: packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
           retention-days: 7
+          if-no-files-found: error
 
   # Publish to npm with all prebuilds
   publish:
     name: Publish to npm and Create Tag
     needs: [validate, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      contents: write
-      id-token: write
-      issues: write
-      pull-requests: write
-    
+      contents: write       # commit version bump, push tag, create release
+      id-token: write       # npm provenance (OIDC trusted publishing)
+      issues: write         # comment on released PRs
+      pull-requests: write  # comment on released PRs
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           ref: master
-          fetch-depth: 0  # Fetch all history for proper tagging
+          fetch-depth: 0  # Full history for tag lookup and release-note ranges
           submodules: recursive
 
       - name: Configure Git
@@ -229,39 +226,27 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.33.4
 
       - name: Update package.json version
         shell: bash
+        working-directory: packages/${{ needs.validate.outputs.package }}
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          PACKAGE="${{ needs.validate.outputs.package }}"
-          VERSION="${{ needs.validate.outputs.version }}"
-          PACKAGE_JSON="packages/$PACKAGE/package.json"
-          
-          echo "Updating $PACKAGE_JSON to version $VERSION"
-          
-          # Update version in package.json using node
-          node -e "
-            const fs = require('fs');
-            const path = '$PACKAGE_JSON';
-            const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-            pkg.version = '$VERSION';
-            fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-          "
-          
+          npm pkg set version="$VERSION"
           echo "✓ Updated package.json version to $VERSION"
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build TypeScript
         working-directory: packages/${{ needs.validate.outputs.package }}
@@ -275,75 +260,109 @@ jobs:
 
       - name: Organize prebuilds
         shell: bash
+        env:
+          PACKAGE: ${{ needs.validate.outputs.package }}
         run: |
-          mkdir -p packages/${{ needs.validate.outputs.package }}/prebuilds
-          
-          # Copy all prebuilds to the package directory
+          mkdir -p "packages/$PACKAGE/prebuilds"
+
           for artifact in artifacts/prebuilds-*; do
             if [ -d "$artifact" ]; then
               echo "Processing $artifact"
-              cp -r "$artifact"/* packages/${{ needs.validate.outputs.package }}/prebuilds/ || true
+              cp -r "$artifact"/* "packages/$PACKAGE/prebuilds/"
             fi
           done
-          
-          # List all prebuilds
+
           echo "Available prebuilds:"
-          find packages/${{ needs.validate.outputs.package }}/prebuilds -name "*.node" -o -name "*.json"
+          find "packages/$PACKAGE/prebuilds" -name "*.node"
+
+      - name: Verify prebuild completeness
+        shell: bash
+        env:
+          PACKAGE: ${{ needs.validate.outputs.package }}
+        run: |
+          # Refuse to publish a package missing any platform we claim to support —
+          # a partial artifact download would otherwise ship silently.
+          MISSING=0
+          for platform in linux-x64 linux-arm64 win32-x64 win32-arm64 darwin-x64 darwin-arm64; do
+            if ! ls "packages/$PACKAGE/prebuilds/$platform"/*.node >/dev/null 2>&1; then
+              echo "::error::Missing prebuild for $platform"
+              MISSING=1
+            else
+              echo "✓ $platform"
+            fi
+          done
+          exit $MISSING
 
       - name: Update npm
+        # OIDC trusted publishing with provenance requires a recent npm
         run: npm install -g npm@latest
-        
+
       - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
         working-directory: packages/${{ needs.validate.outputs.package }}
         run: npm publish --provenance --access public --tag ${{ inputs.npm_tag }}
-      - name: Commit version bump
+
+      - name: Pack tarball (dry run)
+        if: ${{ inputs.dry_run }}
+        working-directory: packages/${{ needs.validate.outputs.package }}
+        run: npm pack
+
+      - name: Upload tarball (dry run)
+        if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: npm-tarball
+          path: packages/${{ needs.validate.outputs.package }}/*.tgz
+          retention-days: 7
+
+      - name: Commit version bump, create and push tag
+        if: ${{ !inputs.dry_run }}
         shell: bash
+        env:
+          PACKAGE: ${{ needs.validate.outputs.package }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ inputs.tag }}
         run: |
-          PACKAGE="${{ needs.validate.outputs.package }}"
-          VERSION="${{ needs.validate.outputs.version }}"
-          
           git add "packages/$PACKAGE/package.json"
           git commit -m "chore: [AUTOMATION] Bump $PACKAGE to v$VERSION"
-          
-          echo "✓ Committed version bump"
-      
-      - name: Create tag
-        shell: bash
-        run: |
-          TAG="${{ inputs.tag }}"
           git tag "$TAG"
-          echo "✓ Created tag: $TAG"
-      
-      - name: Push commit and tag
-        shell: bash
-        run: |
-          TAG="${{ inputs.tag }}"
           git push origin master
           git push origin "$TAG"
-          echo "✓ Successfully pushed commit and tag: $TAG"
+          echo "✓ Pushed version bump commit and tag: $TAG"
 
-      - name: Find previous tag for package
-        id: prev_tag
+      - name: Find previous tags and released PRs
+        id: history
         shell: bash
+        env:
+          PACKAGE: ${{ needs.validate.outputs.package }}
+          CURRENT: ${{ inputs.tag }}
         run: |
-          PACKAGE="${{ needs.validate.outputs.package }}"
-          CURRENT="${{ inputs.tag }}"
-
-          # Fetch all tags from remote to ensure we see prior releases
           git fetch --tags --force
 
-          # Find latest stable (non-prerelease) tag for this package, excluding the one just created
-          PREV=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -E "^${PACKAGE}/v[0-9]+\.[0-9]+\.[0-9]+$" | grep -v "^${CURRENT}$" | head -n 1)
+          # Latest stable (non-prerelease) tag for this package — baseline for release notes
+          PREV_STABLE=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -E "^${PACKAGE}/v[0-9]+\.[0-9]+\.[0-9]+$" | grep -v "^${CURRENT}$" | head -n 1 || true)
+          # Latest tag of any kind for this package — baseline for PR comments,
+          # so PRs already announced in a prior dev release are not commented twice
+          PREV_ANY=$(git tag -l "$PACKAGE/v*" --sort=-version:refname | grep -v "^${CURRENT}$" | head -n 1 || true)
 
-          if [ -z "$PREV" ]; then
-            echo "No previous stable tag found for package $PACKAGE (first stable release)"
+          echo "previous_tag=$PREV_STABLE" >> "$GITHUB_OUTPUT"
+          echo "Previous stable tag: ${PREV_STABLE:-<none>}"
+          echo "Previous tag (any): ${PREV_ANY:-<none>}"
+
+          # PRs merged since the previous tag that touched this package or the upstream submodules
+          if [ -n "$PREV_ANY" ]; then
+            RANGE="$PREV_ANY..HEAD"
           else
-            echo "Previous stable tag for $PACKAGE: $PREV"
+            RANGE="HEAD"
           fi
+          PR_NUMBERS=$(git log "$RANGE" --format=%s -- "packages/$PACKAGE" thirdparty .github scripts \
+            | grep -oE '#[0-9]+' | tr -d '#' | sort -un | head -n 10 | tr '\n' ' ' || true)
 
-          echo "previous_tag=$PREV" >> $GITHUB_OUTPUT
+          echo "pr_numbers=$PR_NUMBERS" >> "$GITHUB_OUTPUT"
+          echo "PRs included in this release: ${PR_NUMBERS:-<none>}"
 
       - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
@@ -351,79 +370,97 @@ jobs:
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
-          previous_tag: ${{ steps.prev_tag.outputs.previous_tag }}
-          body: |            
+          previous_tag: ${{ steps.history.outputs.previous_tag }}
+          body: |
             ${{ needs.validate.outputs.is_prerelease == 'true' && '⚠️ **This is a prerelease version**' || '' }}
 
             ## Installation
             ```bash
             npm install @jamiephan/${{ needs.validate.outputs.package }}@${{ needs.validate.outputs.version }}
             ```
-            
+
             ${{ needs.validate.outputs.is_prerelease == 'true' && format('Or install with the npm tag: `npm install @jamiephan/{0}@{1}`', needs.validate.outputs.package, inputs.npm_tag) || '' }}
 
             ## Supported Platforms
             This release includes prebuilt N-API binaries for:
             - **Linux (x64, arm64)**
             - **Windows (x64, arm64)**
+            - **macOS (x64, arm64)**
 
             If your platform is not listed, the package will build from source automatically.
 
             ## Documentation
             For usage instructions, please refer to the [README](https://github.com/jamiephan/casclib-stormlib-monorepo/blob/master/packages/${{ needs.validate.outputs.package }}/README.md).
-
-          # files: |
-          #   packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Summary
-        shell: bash
-        run: |
-          TAG="${{ inputs.tag }}"
-          VERSION="${{ needs.validate.outputs.version }}"
-          NPM_TAG="${{ inputs.npm_tag }}"
-          echo "### ✅ Release Completed Successfully" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package:** \`@jamiephan/${{ needs.validate.outputs.package }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
-          echo "**NPM Tag:** \`$NPM_TAG\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Git Tag:** \`$TAG\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✓ Published to npm" >> $GITHUB_STEP_SUMMARY
-          echo "✓ Version bump committed and pushed" >> $GITHUB_STEP_SUMMARY
-          echo "✓ Git tag created and pushed" >> $GITHUB_STEP_SUMMARY
-          echo "✓ GitHub release created" >> $GITHUB_STEP_SUMMARY
-
-      - name: Comment on related PRs
-        if: success()
+      - name: Comment on released PRs
+        if: ${{ !inputs.dry_run && steps.history.outputs.pr_numbers != '' }}
         uses: actions/github-script@v8
+        env:
+          PR_NUMBERS: ${{ steps.history.outputs.pr_numbers }}
         with:
           script: |
-            const package = '${{ needs.validate.outputs.package }}';
+            const pkg = '${{ needs.validate.outputs.package }}';
             const version = '${{ needs.validate.outputs.version }}';
             const tag = '${{ inputs.tag }}';
-            
-            // Find recent merged PRs (last 10)
-            const { data: pulls } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'closed',
-              sort: 'updated',
-              direction: 'desc',
-              per_page: 10
-            });
+            const prNumbers = process.env.PR_NUMBERS.trim().split(/\s+/).map(Number);
 
-            const mergedPRs = pulls.filter(pr => pr.merged_at);
+            for (const number of prNumbers) {
+              try {
+                // Only comment on PRs that were actually merged
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: number
+                });
+                if (!pr.merged_at) continue;
 
-            for (const pr of mergedPRs.slice(0, 5)) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                body: `🎉 **@jamiephan/${package}** \`v${version}\` has been published!\n\n` +
-                      `This PR's changes are now available on npm.\n\n` +
-                      `📦 Install: \`npm install @jamiephan/${package}@${version}\`\n` +
-                      `🏷️ Release: [${tag}](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tag})`
-              });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: number,
+                  body: `🎉 **@jamiephan/${pkg}** \`v${version}\` has been published!\n\n` +
+                        `This PR's changes are now available on npm.\n\n` +
+                        `📦 Install: \`npm install @jamiephan/${pkg}@${version}\`\n` +
+                        `🏷️ Release: [${tag}](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tag})`
+                });
+              } catch (error) {
+                core.warning(`Could not comment on PR #${number}: ${error.message}`);
+              }
             }
+
+      - name: Summary
+        shell: bash
+        env:
+          PACKAGE: ${{ needs.validate.outputs.package }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          NPM_TAG: ${{ inputs.npm_tag }}
+          TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "### 🧪 Dry Run Completed Successfully"
+              echo ""
+              echo "**Package:** \`@jamiephan/$PACKAGE\`"
+              echo "**Version:** \`$VERSION\`"
+              echo ""
+              echo "✓ All platforms built and verified"
+              echo "✓ Tarball packed and uploaded as the \`npm-tarball\` artifact"
+              echo ""
+              echo "Nothing was published, committed, tagged, or released."
+            else
+              echo "### ✅ Release Completed Successfully"
+              echo ""
+              echo "**Package:** \`@jamiephan/$PACKAGE\`"
+              echo "**Version:** \`$VERSION\`"
+              echo "**NPM Tag:** \`$NPM_TAG\`"
+              echo "**Git Tag:** \`$TAG\`"
+              echo ""
+              echo "✓ Published to npm"
+              echo "✓ Version bump committed and pushed"
+              echo "✓ Git tag created and pushed"
+              echo "✓ GitHub release created"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

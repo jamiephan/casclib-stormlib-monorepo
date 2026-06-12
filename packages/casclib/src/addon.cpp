@@ -32,8 +32,7 @@ Napi::Value OpenLocalFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!CascOpenLocalFile(filename.c_str(), flags, &hFile)) {
-    std::string error = "Failed to open local file: " + filename + FormatCascError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to open local file: " + filename);
     return env.Null();
   }
 

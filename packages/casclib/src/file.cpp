@@ -4,12 +4,58 @@
 
 Napi::FunctionReference CascFile::constructor;
 
+// Reads the remaining file contents on a worker thread. CASC reads can
+// trigger CDN downloads for online storages, so this must not block the
+// event loop. The receiver keeps the JS File object (and thus the native
+// handle) alive while the worker runs.
+class CascReadAllWorker : public Napi::AsyncWorker {
+public:
+  CascReadAllWorker(Napi::Env env, Napi::Object receiver, CascFile* file)
+    : Napi::AsyncWorker(env, "casclib:readAllAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      file(file), bytesRead(0), errorCode(0) {}
+
+  void Execute() override {
+    DWORD fileSize = CascGetFileSize(file->hFile, nullptr);
+    if (fileSize == 0) {
+      return;
+    }
+    buffer.resize(fileSize);
+    if (!CascReadFile(file->hFile, buffer.data(), fileSize, &bytesRead)) {
+      errorCode = GetCascError();
+      SetError("Failed to read file");
+    }
+  }
+
+  void OnOK() override {
+    deferred.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), buffer.data(), bytesRead));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (CascError=" + std::to_string(errorCode) +
+                          " " + CascErrorName(errorCode) + ")";
+    deferred.Reject(MakeCascError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  CascFile* file;
+  std::vector<uint8_t> buffer;
+  DWORD bytesRead;
+  DWORD errorCode;
+};
+
 Napi::Object CascFile::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "File", {
     InstanceMethod("CascReadFile", &CascFile::Read),
     InstanceMethod("readFileAll", &CascFile::ReadAll),
+    InstanceMethod("readAllAsync", &CascFile::ReadAllAsync),
     InstanceMethod("CascGetFileSize", &CascFile::GetSize),
     InstanceMethod("CascGetFileSize64", &CascFile::GetSize64),
     InstanceMethod("CascGetFilePointer", &CascFile::GetPosition),
@@ -67,8 +113,7 @@ Napi::Value CascFile::Read(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!CascReadFile(hFile, buffer.data(), bytesToRead, &bytesRead)) {
-    Napi::Error::New(env, "Failed to read file" + FormatCascError())
-      .ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to read file");
     return env.Null();
   }
 
@@ -94,12 +139,26 @@ Napi::Value CascFile::ReadAll(const Napi::CallbackInfo& info) {
   DWORD bytesRead = 0;
 
   if (!CascReadFile(hFile, buffer.data(), fileSize, &bytesRead)) {
-    Napi::Error::New(env, "Failed to read file" + FormatCascError())
-      .ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to read file");
     return env.Null();
   }
 
   return Napi::Buffer<uint8_t>::Copy(env, buffer.data(), bytesRead);
+}
+
+Napi::Value CascFile::ReadAllAsync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  auto* worker = new CascReadAllWorker(env, info.This().As<Napi::Object>(), this);
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
 }
 
 Napi::Value CascFile::GetSize(const Napi::CallbackInfo& info) {
@@ -178,8 +237,7 @@ Napi::Value CascFile::GetSize64(const Napi::CallbackInfo& info) {
 
   ULONGLONG fileSize = 0;
   if (!CascGetFileSize64(hFile, &fileSize)) {
-    Napi::Error::New(env, "Failed to get file size" + FormatCascError())
-      .ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to get file size");
     return env.Null();
   }
 
@@ -197,8 +255,7 @@ Napi::Value CascFile::GetPosition64(const Napi::CallbackInfo& info) {
 
   ULONGLONG position = 0;
   if (!CascSetFilePointer64(hFile, 0, &position, FILE_CURRENT)) {
-    Napi::Error::New(env, "Failed to get file position" + FormatCascError())
-      .ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to get file position");
     return env.Null();
   }
 
@@ -229,8 +286,7 @@ Napi::Value CascFile::SetPosition64(const Napi::CallbackInfo& info) {
 
   ULONGLONG newPosition = 0;
   if (!CascSetFilePointer64(hFile, position, &newPosition, moveMethod)) {
-    Napi::Error::New(env, "Failed to set file position" + FormatCascError())
-      .ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to set file position");
     return env.Null();
   }
 
