@@ -21,7 +21,7 @@ pnpm install
 pnpm rebuild   # node-gyp compile + tsc + ESM wrapper
 ```
 
-Toolchain: pnpm 8, Node ≥18 (CI/release uses Node 22). Windows needs VS build tools; Linux needs `build-essential`, `zlib1g-dev`, `libbz2-dev`; macOS needs Xcode CLT (`xcode-select --install`) — system zlib/bzip2 are linked for stormlib.
+Toolchain: pnpm 10 (version pinned via root `packageManager` field), Node ≥18 (CI/release uses Node 24). Windows needs VS build tools; Linux needs `build-essential`, `zlib1g-dev`, `libbz2-dev`; macOS needs Xcode CLT (`xcode-select --install`) — system zlib/bzip2 are linked for stormlib.
 
 `.npmrc` sets `node-linker=hoisted` — pnpm flattens all deps into the root `node_modules` (npm/yarn style). No per-package `node_modules` directories. Don't switch to isolated linker without a reason; native addon resolution and `node -p "require('node-addon-api').include"` already work under hoisted layout.
 
@@ -63,31 +63,36 @@ npx node-gyp rebuild
 ## Build pipeline (three stages)
 
 1. **Native** (`node-gyp-build`, triggered by `install` script): compiles `src/*.cpp` + every upstream `.cpp` listed in `binding.gyp` into `build/Release/{casclib,stormlib}.node`. `prebuildify --napi --strip` produces redistributable binaries under `prebuilds/`. Runtime resolution uses `node-gyp-build` (loads prebuilt if matching arch/platform, otherwise compiles from source).
-2. **TypeScript** (`tsc`): `lib/*.ts` → `dist/*.js` + `.d.ts`. Target ES2020, CommonJS, strict mode.
+2. **TypeScript** (`tsc`): `lib/*.ts` → `dist/*.js` + `.d.ts`. Target ES2022, CommonJS, strict mode.
 3. **ESM wrapper** (`scripts/generate-esm.js`): introspects exported names from `dist/index.js`, emits `dist/index.mjs` using `createRequire(import.meta.url)('./index.js')` and re-exports every named binding. `package.json` `exports` map routes `import` → `.mjs`, `require` → `.js`. Reason: `.node` addons are inherently CJS; this avoids dual compilation.
 
 If you change exports in `lib/index.ts`, re-run `pnpm build` so `.mjs` regenerates — stale ESM wrappers cause silent missing exports.
 
 ## Two-layer API design
 
-Each package exposes both layers from the same entry point:
+Each package exposes both layers from the same entry point (`lib/index.ts` only re-exports):
 
-- **High-level wrapper** (`lib/index.ts`): `Storage` / `Archive` / `File` classes with friendly camelCase methods (`storage.open()`, `archive.openFile()`).
+- **High-level wrapper** (`lib/storage.ts`+`lib/file.ts` for casclib, `lib/archive.ts`+`lib/file.ts` for stormlib): `Storage` / `Archive` / `File` classes with friendly camelCase methods, static factories that return opened handles (`Storage.open(...)`, `Archive.create(...)`), Promise-based async variants (`openAsync`, `readFileAsync`, `extractFileAsync`), lazy iteration (`storage.files(mask)`, `Symbol.iterator`), and `Symbol.dispose` support.
 - **Low-level bindings** (`lib/bindings.ts`): `CascStorageBinding` / `MPQArchiveBinding` instances exposing **exact upstream C++ function names** (`CascOpenStorage`, `SFileOpenArchive`, `CascGetFileSize64`). See `packages/*/BINDING_NAMING_CONVENTION.md`.
 
-Rule when adding methods: native binding name = upstream C name (no case change, no prefix strip). Wrapper method = simplified camelCase. Helper methods that don't exist upstream (e.g., `fileExists`, `readFileAll`) use camelCase in both layers.
+Other TS modules per package: `lib/errors.ts` (`CascError`/`StormError` + `invoke`/`invokeAsync` translation helpers), `lib/constants.ts` (constants), `lib/dispose.ts` (`Symbol.dispose` polyfill).
+
+Errors: the native layer attaches `code` (numeric, from `GetCascError`/`SErrGetLastError`) and `codeName` (e.g. `"ERROR_FILE_NOT_FOUND"`) to every thrown error/rejection. Wrapper methods route native calls through `invoke()`/`invokeAsync()`, which rethrow as `CascError`/`StormError`. Detection in `from()` is shape-based, not `instanceof Error` — native errors come from the real Node realm and fail `instanceof` under Jest's VM contexts.
+
+Rule when adding methods: native binding name = upstream C name (no case change, no prefix strip). Wrapper method = simplified camelCase. Helper methods that don't exist upstream (e.g., `fileExists`, `readFileAll`, `openAsync`) use camelCase in both layers.
 
 Adding a new native method requires four edits in lockstep:
 1. `src/*.cpp` — implement `Napi::Value` method, register via `InstanceMethod()` in `Init()`.
 2. `lib/bindings.ts` — declare on the interface.
-3. `lib/index.ts` — wrap in friendly method.
+3. `lib/storage.ts` / `lib/archive.ts` / `lib/file.ts` — wrap in friendly method via `invoke()`.
 4. `test/*.test.ts` — integration test.
 
 ## C++ binding conventions
 
-- `NAPI_DISABLE_CPP_EXCEPTIONS` is set. Errors must be thrown via `Napi::Error::New(env, "...").ThrowAsJavaScriptException(); return env.Undefined();` — do not use `throw`.
-- Native handles (storage/archive/file) require explicit `close()`. Wrappers do not auto-close; callers use `try/finally`.
-- Platform conditionals in `binding.gyp`: Windows enables MSVC `ExceptionHandling=1` and defines `_WINDOWS`/`WIN32`; Linux uses `-std=c++17`; macOS uses libc++, deployment target 10.15. casclib bundles its own zlib (under `thirdparty/CascLib/src/zlib/`) and sets `Z_SOLO=1` on macOS.
+- `NAPI_DISABLE_CPP_EXCEPTIONS` is set. Library failures must be thrown via `ThrowCascError(env, msg)` / `ThrowStormError(env, msg)` (defined in `src/errors.cpp` — appends the error suffix and sets `code`/`codeName` props); plain `Napi::TypeError` for argument validation. Do not use C++ `throw`.
+- Async methods use `Napi::AsyncWorker` subclasses defined in the same `.cpp` (e.g. `OpenStorageWorker`, `MpqReadAllWorker`). Pattern: worker holds a `Napi::Promise::Deferred` + `Napi::ObjectReference` on the receiver (keeps the JS object and native handle alive), captures the error code in `Execute()` (thread-safe), rejects with `MakeCascError`/`MakeStormError` in `OnError()`. Worker classes are `friend`s of the wrapped class to reach the raw handle.
+- Native handles (storage/archive/file) require explicit `close()`. Wrappers do not auto-close; callers use `try/finally` or `using`. Don't interleave other operations on a handle while one of its async operations is pending.
+- Platform conditionals in `binding.gyp`: Windows enables MSVC `ExceptionHandling=1` and defines `_WINDOWS`/`WIN32`; Linux uses `-std=c++17`; macOS uses libc++, deployment target 10.15. casclib bundles its own zlib (under `thirdparty/CascLib/src/zlib/`) on all platforms. Never define `Z_SOLO` for it: CascLib's `CascDecompress` passes NULL `zalloc`/`zfree`, and `Z_SOLO` removes zlib's default allocators, so every `inflateInit` fails and all decompression returns `ERROR_FILE_CORRUPT` (1004) at runtime while still building fine. The mac build instead preincludes `stdio.h` (`OTHER_CFLAGS: -include stdio.h`) because the bundled zlib's `zutil.h` otherwise defines `fdopen->NULL` under Apple clang's predefined `TARGET_OS_MAC` and breaks `<stdio.h>` parsing in `zutil.c`.
 - `CASCLIB_NO_AUTO_LINK_LIBRARY` prevents pragma-based linking on Windows.
 - **stormlib on macOS**: `StormPort.h` auto-defines `__SYS_ZLIB` + `__SYS_BZLIB` on `__APPLE__`, so `StormCommon.h` includes `<zlib.h>` + `<bzlib.h>` (system headers). `binding.gyp` accordingly excludes bundled `zlib/*.c` + `bzip2/*.c` sources on mac and links `-lz -lbz2`. Don't re-add bundled sources to the mac branch — symbols will collide with system libs.
 
@@ -104,20 +109,24 @@ stormlib tests use local MPQ fixtures under `packages/stormlib/test/files/`.
 `.github/workflows/release.yml` — manual `workflow_dispatch` only, must run on `master`.
 
 - Input `tag` must match `^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` (e.g. `casclib/v1.0.0`, `stormlib/v0.0.0-dev.3`).
-- Input `npm_tag` is `latest` or `dev`.
-- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64).
-- Publishes with `npm publish --provenance --access public --tag <npm_tag>` from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments on the 5 most recent merged PRs.
+- Input `npm_tag` is `latest` or `dev`. Validation enforces consistency: prerelease versions must use `dev`, stable versions must use `latest`.
+- Input `dry_run` (boolean): builds all platforms, verifies prebuilds, packs the tarball as an artifact — but does not publish, commit, tag, or release.
+- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 24 across 6 targets: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64), `macos-15-intel` (darwin x64), `macos-15` (darwin arm64).
+- Before publish, verifies all 6 platform prebuild dirs contain a `.node` — a partial artifact download fails the run instead of shipping silently.
+- Publishes with `npm publish --provenance --access public --tag <npm_tag>` (npm OIDC trusted publishing — no token secret) from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments only on PRs merged since the package's previous tag whose commits touched that package (parsed from squash-merge subjects).
 - **Versions are not bumped manually** — let the workflow do it. Don't tag locally.
 
-`.github/workflows/pr-test.yml` matrix-tests the same 4 OS/arch combos × casclib + stormlib on every PR.
+`.github/workflows/pr-test.yml` (workflow name "Test") matrix-tests the same 6 OS/arch combos × casclib + stormlib on every PR, push to `master`, and manual dispatch. PR runs cancel superseded runs via `concurrency`. pnpm version comes from the root `packageManager` field (pnpm/action-setup reads it); pnpm store is cached via setup-node.
 
-**macOS not in CI.** Native code is fully macOS-compatible (binding.gyp mac branch + system zlib/bzip2 links) and source builds work on Xcode CLT. Online-storage tests fail in GitHub Actions macOS runners because Blizzard's CDN port 1119 is not reachable from those runners' egress, producing `CascError=ERROR_FILE_NOT_FOUND` from empty CSV responses. No prebuilds shipped for mac — falls back to source build at install. If you have local mac hardware, run `pnpm rebuild && pnpm test` to verify changes.
+`.github/dependabot.yml` keeps GitHub Actions (weekly, grouped), npm deps (monthly), and the upstream submodules (monthly) updated.
 
 ## Files worth knowing
 
 - `packages/*/binding.gyp` — source list, defines, platform conds. Edit when adding/removing upstream `.cpp` files.
-- `packages/*/lib/bindings.ts` — raw N-API contract (TypeScript declarations of the C++ surface).
-- `packages/*/lib/index.ts` — wrapper classes + JSDoc that drives the public API docs.
-- `packages/stormlib/lib/constants.ts` — re-exported MPQ flags/locales/compression constants.
+- `packages/*/lib/bindings.ts` — raw N-API contract (TypeScript declarations of the C++ surface) + native loader.
+- `packages/casclib/lib/storage.ts`, `packages/stormlib/lib/archive.ts`, `packages/*/lib/file.ts` — wrapper classes + JSDoc that drives the public API docs.
+- `packages/*/lib/errors.ts` — `CascError`/`StormError` and native-error translation.
+- `packages/*/lib/constants.ts` — constants (casclib re-exports from the native addon; stormlib hardcodes MPQ flags/locales/compression).
+- `packages/*/src/errors.cpp` — `ThrowCascError`/`ThrowStormError`, `MakeCascError`/`MakeStormError`, error-name tables.
 - `scripts/generate-esm.js` — ESM wrapper generator; runs per-package via `pnpm build`.
 - `.github/copilot-instructions.md` — original detailed contributor guide; this file is the condensed operating manual.

@@ -8,8 +8,11 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 - Extract files from classic Blizzard games
 - Create new archives and modify existing ones
 - File compression and encryption support
+- Promise-based async API — archive opening, reads, and extraction run on worker threads
+- Structured errors (`StormError` with numeric `code` and symbolic `codeName`)
+- Static factories (`Archive.open(...)`, `Archive.create(...)`) and file iteration (`for (const f of archive)`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage
@@ -63,13 +66,41 @@ const { Archive, File } = require('@jamiephan/stormlib');
 import { MPQArchiveBinding, MPQArchive, MPQFile } from '@jamiephan/stormlib';
 ```
 
+### Quick start (modern API)
+
+```typescript
+import { Archive, StormError } from '@jamiephan/stormlib';
+
+// Static factories return an already-opened archive
+const archive = await Archive.openAsync('/path/to/war3map.w3x');
+
+try {
+  // Promise-based reads and extraction (off the event loop)
+  const script = await archive.readFileAsync('war3map.j');
+  await archive.extractFileAsync('war3map.j', '/tmp/war3map.j');
+
+  // Iterate files lazily
+  for (const entry of archive.files('*.txt')) {
+    console.log(entry.name, entry.fileSize);
+  }
+} catch (err) {
+  if (err instanceof StormError) {
+    // Structured error info from SErrGetLastError()
+    console.error(err.code, err.codeName, err.message);
+  }
+  throw err;
+} finally {
+  archive.close();
+}
+```
+
 ### Opening an MPQ Archive
 
 ```typescript
 import { Archive } from '@jamiephan/stormlib';
 
-const archive = new Archive();
-archive.open('/path/to/archive.mpq');
+const archive = Archive.open('/path/to/archive.mpq');
+// (the instance API still works: const archive = new Archive(); archive.open(...))
 
 // Check if a file exists
 if (archive.hasFile('war3map.j')) {

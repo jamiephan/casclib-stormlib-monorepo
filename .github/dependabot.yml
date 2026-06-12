@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Keep GitHub Actions versions current (checkout, setup-node, etc.)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - '*'
+
+  # npm dependencies across the pnpm workspace
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # Upstream CascLib / StormLib submodules — bumps still need a manual
+  # binding.gyp source-list review, but CI will compile-check the PR
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: monthly

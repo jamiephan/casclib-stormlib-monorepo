@@ -1,6 +1,18 @@
-// Native bindings for StormLib
+/**
+ * Low-level native bindings for StormLib.
+ *
+ * Method names on these interfaces match the upstream C function names
+ * exactly (see BINDING_NAMING_CONVENTION.md). Helpers that have no upstream
+ * equivalent (e.g. `readFileAll`, `openAsync`) use camelCase.
+ *
+ * Most consumers should use the high-level `Archive` / `File` classes from
+ * the package entry point instead.
+ */
 import * as path from 'path';
-const bindings = require('node-gyp-build')(path.join(__dirname, '..'));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+export const native = require('node-gyp-build')(path.join(__dirname, '..'));
+const bindings = native;
 
 /**
  * Native MPQArchive interface
@@ -13,6 +25,10 @@ export interface MPQArchive {
   SFileCloseArchive(): boolean;
   SFileFlushArchive(): boolean;
   SFileCompactArchive(): boolean;
+
+  // Async helpers (no upstream equivalent — run on a libuv worker thread)
+  openAsync(path: string, flags: number): Promise<boolean>;
+  extractFileAsync(source: string, destination: string): Promise<boolean>;
 
   // File operations
   SFileOpenFileEx(filename: string, flags: number): MPQFile;
@@ -85,6 +101,7 @@ export interface MPQArchiveConstructor {
 export interface MPQFile {
   SFileReadFile(bytesToRead: number): Buffer;
   readFileAll(): Buffer;  // Helper function, not in StormLib.h
+  readAllAsync(): Promise<Buffer>;  // Helper function, worker-thread variant
   SFileWriteFile(data: Buffer, compression: number): boolean;
   SFileFinishFile(): boolean;
   SFileGetFileSize(): number;

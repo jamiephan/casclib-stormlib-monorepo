@@ -5,12 +5,64 @@
 
 Napi::FunctionReference CascStorage::constructor;
 
+// Opens a local or online CASC storage off the event loop. Online storages
+// hit Blizzard's CDN and can block for minutes, so a worker thread is the
+// only acceptable place for that call. The receiver keeps the JS Storage
+// object alive while the worker runs.
+class OpenStorageWorker : public Napi::AsyncWorker {
+public:
+  OpenStorageWorker(Napi::Env env, Napi::Object receiver, CascStorage* storage,
+                    std::string path, DWORD flags, bool online)
+    : Napi::AsyncWorker(env, online ? "casclib:openOnlineAsync" : "casclib:openAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      storage(storage), path(std::move(path)), flags(flags), online(online),
+      hStorage(nullptr), errorCode(0) {}
+
+  void Execute() override {
+    bool ok = online
+      ? CascOpenOnlineStorage(path.c_str(), flags, &hStorage)
+      : CascOpenStorage(path.c_str(), flags, &hStorage);
+    if (!ok) {
+      errorCode = GetCascError();
+      SetError(std::string(online ? "Failed to open online CASC storage: "
+                                  : "Failed to open CASC storage: ") + path);
+    }
+  }
+
+  void OnOK() override {
+    storage->hStorage = hStorage;
+    storage->isOpen = true;
+    deferred.Resolve(Napi::Boolean::New(Env(), true));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (CascError=" + std::to_string(errorCode) +
+                          " " + CascErrorName(errorCode) + ")";
+    deferred.Reject(MakeCascError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  CascStorage* storage;
+  std::string path;
+  DWORD flags;
+  bool online;
+  HANDLE hStorage;
+  DWORD errorCode;
+};
+
 Napi::Object CascStorage::Init(Napi::Env env, Napi::Object exports) {
   Napi::HandleScope scope(env);
 
   Napi::Function func = DefineClass(env, "Storage", {
     InstanceMethod("CascOpenStorage", &CascStorage::Open),
     InstanceMethod("CascOpenOnlineStorage", &CascStorage::OpenOnline),
+    InstanceMethod("openAsync", &CascStorage::OpenAsync),
+    InstanceMethod("openOnlineAsync", &CascStorage::OpenOnlineAsync),
     InstanceMethod("CascOpenStorageEx", &CascStorage::OpenEx),
     InstanceMethod("CascCloseStorage", &CascStorage::Close),
     InstanceMethod("CascOpenFile", &CascStorage::OpenFile),
@@ -88,13 +140,50 @@ Napi::Value CascStorage::Open(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open CASC storage: " + path + FormatCascError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to open CASC storage: " + path);
     return env.Null();
   }
 
   isOpen = true;
   return Napi::Boolean::New(env, true);
+}
+
+// Shared argument parsing + worker queueing for openAsync/openOnlineAsync.
+static Napi::Value QueueOpenStorageWorker(const Napi::CallbackInfo& info, CascStorage* self,
+                                          bool isOpenAlready, bool online) {
+  Napi::Env env = info.Env();
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    Napi::TypeError::New(env, "Expected storage path as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  if (isOpenAlready) {
+    Napi::Error::New(env, "Storage is already open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  std::string path = info[0].As<Napi::String>().Utf8Value();
+  DWORD flags = 0;
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    flags = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  auto* worker = new OpenStorageWorker(env, info.This().As<Napi::Object>(), self,
+                                       std::move(path), flags, online);
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
+}
+
+Napi::Value CascStorage::OpenAsync(const Napi::CallbackInfo& info) {
+  return QueueOpenStorageWorker(info, this, isOpen, false);
+}
+
+Napi::Value CascStorage::OpenOnlineAsync(const Napi::CallbackInfo& info) {
+  return QueueOpenStorageWorker(info, this, isOpen, true);
 }
 
 Napi::Value CascStorage::Close(const Napi::CallbackInfo& info) {
@@ -137,8 +226,7 @@ Napi::Value CascStorage::OpenFile(const Napi::CallbackInfo& info) {
 
   HANDLE hFile;
   if (!CascOpenFile(hStorage, filename.c_str(), CASC_LOCALE_ALL, dwFlags, &hFile)) {
-    std::string error = "Failed to open file: " + filename + FormatCascError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to open file: " + filename);
     return env.Null();
   }
 
@@ -236,8 +324,7 @@ Napi::Value CascStorage::OpenOnline(const Napi::CallbackInfo& info) {
   }
 
   if (!CascOpenOnlineStorage(path.c_str(), flags, &hStorage)) {
-    std::string error = "Failed to open online CASC storage: " + path + FormatCascError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to open online CASC storage: " + path);
     return env.Null();
   }
 
@@ -324,8 +411,7 @@ Napi::Value CascStorage::OpenEx(const Napi::CallbackInfo& info) {
 
   // Call CascOpenStorageEx
   if (!CascOpenStorageEx(params.c_str(), &args, bOnlineStorage, &hStorage)) {
-    std::string error = "Failed to open CASC storage with extended parameters: " + params + FormatCascError();
-    Napi::Error::New(env, error).ThrowAsJavaScriptException();
+    ThrowCascError(env, "Failed to open CASC storage with extended parameters: " + params);
     return env.Null();
   }
 

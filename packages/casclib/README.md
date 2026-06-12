@@ -6,8 +6,11 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 
 - Read CASC storage archives (local and online)
 - Extract files from modern Blizzard games
+- Promise-based async API — storage opening and file reads run on worker threads, never blocking the event loop
+- Structured errors (`CascError` with numeric `code` and symbolic `codeName`)
+- Static factories (`Storage.open(...)`) and lazy file iteration (`for (const f of storage.files('*.xml'))`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage
@@ -70,13 +73,43 @@ import {
 } from '@jamiephan/casclib';
 ```
 
+### Quick start (modern API)
+
+```typescript
+import { Storage, CascError } from '@jamiephan/casclib';
+
+// Static factories return an already-opened storage.
+// Async variants run on a worker thread — opening an online storage can
+// take minutes (CDN downloads), so never use the sync variant in a server.
+const storage = await Storage.openOnlineAsync('/tmp/casc-cache*hero*us');
+
+try {
+  // Promise-based file read (decompression/downloads off the event loop)
+  const buf = await storage.readFileAsync('mods/core.stormmod/base.stormdata/DataBuildId.txt');
+  console.log(buf.toString('utf-8'));
+
+  // Lazy iteration — the native find handle is released even on early break
+  for (const entry of storage.files('*.xml')) {
+    console.log(entry.fileName, entry.fileSize);
+  }
+} catch (err) {
+  if (err instanceof CascError) {
+    // Structured error info from GetCascError()
+    console.error(err.code, err.codeName, err.message);
+  }
+  throw err;
+} finally {
+  storage.close();
+}
+```
+
 ### Opening a CASC Storage
 
 ```typescript
 import { Storage } from '@jamiephan/casclib';
 
-const storage = new Storage();
-storage.open('/path/to/heroes/HeroesData');
+const storage = Storage.open('/path/to/heroes/HeroesData');
+// (the instance API still works: const storage = new Storage(); storage.open(...))
 
 // Check if a file exists
 if (storage.fileExists('mods/heroesdata.stormmod/base.stormdata/gamedata/heroes/abathurdata/abathurdata.xml')) {

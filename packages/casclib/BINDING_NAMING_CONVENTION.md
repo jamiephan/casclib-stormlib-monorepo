@@ -30,6 +30,8 @@ The JavaScript binding names follow this pattern:
 | `CascFindEncryptionKey` | `CascFindEncryptionKey` | Find encryption key |
 | `CascGetNotFoundEncryptionKey` | `CascGetNotFoundEncryptionKey` | Get not found key name |
 | N/A (helper) | `fileExists` | Check if file exists (helper function) |
+| N/A (helper) | `openAsync` | Promise-based `CascOpenStorage` on a libuv worker thread |
+| N/A (helper) | `openOnlineAsync` | Promise-based `CascOpenOnlineStorage` on a libuv worker thread |
 
 ## File Class Methods
 
@@ -37,6 +39,7 @@ The JavaScript binding names follow this pattern:
 |---|---|---|
 | `CascReadFile` | `CascReadFile` | Read data from file |
 | N/A (helper) | `readFileAll` | Read all file data (helper function) |
+| N/A (helper) | `readAllAsync` | Promise-based `readFileAll` on a libuv worker thread |
 | `CascGetFileSize` | `CascGetFileSize` | Get file size (32-bit) |
 | `CascGetFileSize64` | `CascGetFileSize64` | Get file size (64-bit) |
 | `CascSetFilePointer` | `CascGetFilePointer` | Get current position (32-bit, helper) |
@@ -95,9 +98,24 @@ storage.close(); // Calls storage.CascCloseStorage internally
 
 ## Notes
 
-- The low-level bindings (in `lib/bindings.ts`) now use the **exact names from CascLib.h**
+- The low-level bindings (in `lib/bindings.ts`) use the **exact names from CascLib.h**
 - **Interfaces and enums** are prefixed with `CASC` (e.g., `CascStorage`, `CascFile`, `CascFindData`)
-- The high-level wrapper classes (in `lib/index.ts`) provide simplified method names for better developer experience
-- Tests and documentation use the high-level API, so user-facing APIs remain unchanged
-- Helper functions not in CascLib.h (like `fileExists` and `readFileAll`) use descriptive camelCase names
+- The high-level wrapper classes (`lib/storage.ts`, `lib/file.ts`) provide simplified method names,
+  Promise-based async variants, static factories (`Storage.open(...)`), and structured `CascError`s
+- Errors thrown by the native layer carry `code` (numeric CascLib error code) and `codeName`
+  (e.g. `"ERROR_FILE_NOT_FOUND"`) properties; the wrapper converts them to `CascError` instances
+- Helper functions not in CascLib.h (like `fileExists`, `readFileAll`, `openAsync`) use descriptive camelCase names
 - Constants and enums are exported with their original names (e.g., `CASC_OPEN_BY_NAME`, `CASC_LOCALE_ENUS`)
+  from `lib/constants.ts`
+
+## TypeScript layer layout
+
+| File | Contents |
+|---|---|
+| `lib/bindings.ts` | Native loader (`node-gyp-build`) + raw binding interfaces |
+| `lib/constants.ts` | CascLib constants re-exported from the native addon |
+| `lib/errors.ts` | `CascError`, `CascErrorCode`, native error translation |
+| `lib/storage.ts` | High-level `Storage` class + `withStorage(Async)` |
+| `lib/file.ts` | High-level `File` class |
+| `lib/dispose.ts` | `Symbol.dispose` polyfill for `using` support |
+| `lib/index.ts` | Public entry point re-exporting both layers |

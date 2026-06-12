@@ -17,9 +17,12 @@ public:
 
 private:
   static Napi::FunctionReference constructor;
+  friend class OpenArchiveWorker;
+  friend class ExtractFileWorker;
 
   // Archive operations
   Napi::Value Open(const Napi::CallbackInfo& info);
+  Napi::Value OpenAsync(const Napi::CallbackInfo& info);
   Napi::Value Create(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
   Napi::Value Flush(const Napi::CallbackInfo& info);
@@ -29,6 +32,7 @@ private:
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
   Napi::Value HasFile(const Napi::CallbackInfo& info);
   Napi::Value ExtractFile(const Napi::CallbackInfo& info);
+  Napi::Value ExtractFileAsync(const Napi::CallbackInfo& info);
   Napi::Value AddFile(const Napi::CallbackInfo& info);
   Napi::Value AddFileEx(const Napi::CallbackInfo& info);
   Napi::Value RemoveFile(const Napi::CallbackInfo& info);
