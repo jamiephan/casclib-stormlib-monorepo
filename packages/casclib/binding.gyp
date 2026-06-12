@@ -82,7 +82,18 @@
             "xcode_settings": {
               "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
               "CLANG_CXX_LIBRARY": "libc++",
-              "MACOSX_DEPLOYMENT_TARGET": "10.15"
+              "MACOSX_DEPLOYMENT_TARGET": "10.15",
+              # Bundled zlib's zutil.h defines fdopen->NULL when TARGET_OS_MAC
+              # is set (Apple clang predefines it), which corrupts the real
+              # fdopen declaration when gzguts.h includes <stdio.h> afterwards.
+              # Preincluding stdio.h makes that later include a no-op.
+              # Do NOT "fix" this with Z_SOLO: it removes zlib's default
+              # allocators, so every inflateInit fails at runtime and all
+              # decompression returns ERROR_FILE_CORRUPT (1004).
+              "OTHER_CFLAGS": [
+                "-include",
+                "stdio.h"
+              ]
             }
           }
         ]
