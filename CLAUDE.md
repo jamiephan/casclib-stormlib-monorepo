@@ -21,7 +21,7 @@ pnpm install
 pnpm rebuild   # node-gyp compile + tsc + ESM wrapper
 ```
 
-Toolchain: pnpm 8, Node ≥18 (CI/release uses Node 22). Windows needs VS build tools; Linux needs `build-essential`, `zlib1g-dev`, `libbz2-dev`; macOS needs Xcode CLT (`xcode-select --install`) — system zlib/bzip2 are linked for stormlib.
+Toolchain: pnpm 10 (version pinned via root `packageManager` field), Node ≥18 (CI/release uses Node 24). Windows needs VS build tools; Linux needs `build-essential`, `zlib1g-dev`, `libbz2-dev`; macOS needs Xcode CLT (`xcode-select --install`) — system zlib/bzip2 are linked for stormlib.
 
 `.npmrc` sets `node-linker=hoisted` — pnpm flattens all deps into the root `node_modules` (npm/yarn style). No per-package `node_modules` directories. Don't switch to isolated linker without a reason; native addon resolution and `node -p "require('node-addon-api').include"` already work under hoisted layout.
 
@@ -109,14 +109,16 @@ stormlib tests use local MPQ fixtures under `packages/stormlib/test/files/`.
 `.github/workflows/release.yml` — manual `workflow_dispatch` only, must run on `master`.
 
 - Input `tag` must match `^(casclib|stormlib)/v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` (e.g. `casclib/v1.0.0`, `stormlib/v0.0.0-dev.3`).
-- Input `npm_tag` is `latest` or `dev`.
-- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 22 across: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64).
-- Publishes with `npm publish --provenance --access public --tag <npm_tag>` from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments on the 5 most recent merged PRs.
+- Input `npm_tag` is `latest` or `dev`. Validation enforces consistency: prerelease versions must use `dev`, stable versions must use `latest`.
+- Input `dry_run` (boolean): builds all platforms, verifies prebuilds, packs the tarball as an artifact — but does not publish, commit, tag, or release.
+- Validates tag doesn't exist, parses package + version, then matrix-builds prebuilds on Node 24 across 6 targets: `ubuntu-latest` (linux x64), `ubuntu-24.04-arm` (linux arm64), `windows-latest` (win x64), `windows-11-arm` (win arm64), `macos-15-intel` (darwin x64), `macos-15` (darwin arm64).
+- Before publish, verifies all 6 platform prebuild dirs contain a `.node` — a partial artifact download fails the run instead of shipping silently.
+- Publishes with `npm publish --provenance --access public --tag <npm_tag>` (npm OIDC trusted publishing — no token secret) from a temporarily-bumped `package.json`, then commits the bump, creates the git tag, pushes, and creates a GitHub release. Comments only on PRs merged since the package's previous tag whose commits touched that package (parsed from squash-merge subjects).
 - **Versions are not bumped manually** — let the workflow do it. Don't tag locally.
 
-`.github/workflows/pr-test.yml` matrix-tests the same 4 OS/arch combos × casclib + stormlib on every PR.
+`.github/workflows/pr-test.yml` (workflow name "Test") matrix-tests the same 6 OS/arch combos × casclib + stormlib on every PR, push to `master`, and manual dispatch. PR runs cancel superseded runs via `concurrency`. pnpm version comes from the root `packageManager` field (pnpm/action-setup reads it); pnpm store is cached via setup-node.
 
-**macOS not in CI.** Native code is fully macOS-compatible (binding.gyp mac branch + system zlib/bzip2 links) and source builds work on Xcode CLT. Online-storage tests fail in GitHub Actions macOS runners because Blizzard's CDN port 1119 is not reachable from those runners' egress, producing `CascError=ERROR_FILE_NOT_FOUND` from empty CSV responses. No prebuilds shipped for mac — falls back to source build at install. If you have local mac hardware, run `pnpm rebuild && pnpm test` to verify changes.
+`.github/dependabot.yml` keeps GitHub Actions (weekly, grouped), npm deps (monthly), and the upstream submodules (monthly) updated.
 
 ## Files worth knowing
 

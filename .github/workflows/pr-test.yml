@@ -1,40 +1,59 @@
-name: PR Test
+name: Test
 
 on:
+  push:
+    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs of the same PR; never cancel master pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test-pr:
+  test:
     name: Test ${{ matrix.package }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm]
+        os:
+          - ubuntu-latest      # linux x64
+          - ubuntu-24.04-arm   # linux arm64
+          - windows-latest     # win32 x64
+          - windows-11-arm     # win32 arm64
+          - macos-15-intel     # darwin x64
+          - macos-15           # darwin arm64
         package: [casclib, stormlib]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           submodules: recursive
 
+      # pnpm must be installed before setup-node so `cache: pnpm` can resolve the store path.
+      # Version is read from the `packageManager` field in package.json (single source of truth).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10.33.4
-
-      - name: Install dependencies
-        run: pnpm install
+      - name: Install dependencies (compiles native addons)
+        run: pnpm install --frozen-lockfile
 
       - name: Build packages
         run: pnpm run build
 
-      - name: Run Test
+      - name: Run tests
         run: pnpm --filter @jamiephan/${{ matrix.package }} test:coverage

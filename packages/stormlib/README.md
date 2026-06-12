@@ -12,7 +12,7 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 - Structured errors (`StormError` with numeric `code` and symbolic `codeName`)
 - Static factories (`Archive.open(...)`, `Archive.create(...)`) and file iteration (`for (const f of archive)`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage

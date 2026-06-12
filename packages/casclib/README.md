@@ -10,7 +10,7 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 - Structured errors (`CascError` with numeric `code` and symbolic `codeName`)
 - Static factories (`Storage.open(...)`) and lazy file iteration (`for (const f of storage.files('*.xml'))`)
 - TypeScript support with full type definitions
-- Cross-platform (Windows x64/arm64, Linux x64/arm64; macOS x64/arm64 builds from source)
+- Cross-platform prebuilt binaries: Windows, Linux, and macOS (x64 and arm64)
 - Both CommonJS and ES Module support
 - High-level wrapper API for ease of use
 - Low-level bindings for advanced usage
