@@ -13,10 +13,12 @@ public:
 
 private:
   static Napi::FunctionReference constructor;
+  friend class MpqReadAllWorker;
 
   // Methods
   Napi::Value Read(const Napi::CallbackInfo& info);
   Napi::Value ReadAll(const Napi::CallbackInfo& info);
+  Napi::Value ReadAllAsync(const Napi::CallbackInfo& info);
   Napi::Value Write(const Napi::CallbackInfo& info);
   Napi::Value Finish(const Napi::CallbackInfo& info);
   Napi::Value GetSize(const Napi::CallbackInfo& info);

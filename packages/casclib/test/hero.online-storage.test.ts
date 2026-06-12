@@ -1,4 +1,4 @@
-import { Storage, File, withStorage } from "../lib";
+import { Storage, File, withStorage, CascError } from "../lib";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -374,6 +374,70 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
         expect(f.readAll().length).toBeGreaterThan(0);
         (f as any)[(Symbol as any).dispose]();
         expect(f.close()).toBe(false);
+      });
+    });
+
+    describe("Modern API (factories, async, iterators, CascError)", () => {
+      const MODERN_TEMP_DIR = os.tmpdir() + "/CASCLIB_TESTS_modern_hero";
+      const MODERN_CONN = `${MODERN_TEMP_DIR}*hero*us`;
+
+      afterAll(() => {
+        if (fs.existsSync(MODERN_TEMP_DIR)) {
+          try { fs.rmSync(MODERN_TEMP_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+      });
+
+      it("Storage.openOnlineAsync factory opens without blocking and reads async", async () => {
+        const s = await Storage.openOnlineAsync(MODERN_CONN);
+        try {
+          expect(s.isOpen).toBe(true);
+          const buf = await s.readFileAsync(dataBuildId);
+          expect(Buffer.isBuffer(buf)).toBe(true);
+          expect(buf.toString("utf-8").startsWith("B")).toBe(true);
+        } finally {
+          s.close();
+        }
+        expect(s.isOpen).toBe(false);
+      }, 300_000); // opening an online storage downloads manifests from the CDN
+
+      it("File.readAllAsync matches sync readAll", async () => {
+        const sync = helperStorage.readFile(dataBuildId);
+        const file = helperStorage.openFile(dataBuildId);
+        try {
+          const async = await file.readAllAsync();
+          expect(async.equals(sync)).toBe(true);
+        } finally {
+          file.close();
+        }
+      });
+
+      it("files() generator lazily iterates and supports early break", () => {
+        const seen: string[] = [];
+        for (const entry of helperStorage.files("*.xml")) {
+          seen.push(entry.fileName);
+          if (seen.length >= 3) break;
+        }
+        expect(seen.length).toBe(3);
+        // The find handle must have been released — a fresh full scan still works
+        expect(helperStorage.findAllFiles("*.xml").length).toBeGreaterThanOrEqual(3);
+      });
+
+      it("sync open failure throws CascError with code and codeName", () => {
+        const s = new Storage();
+        try {
+          s.open("/non/existent/casc/storage");
+          fail("expected open() to throw");
+        } catch (err) {
+          expect(err).toBeInstanceOf(CascError);
+          expect(typeof (err as CascError).code).toBe("number");
+          expect((err as CascError).code).toBeGreaterThan(0);
+          expect(typeof (err as CascError).codeName).toBe("string");
+        }
+      });
+
+      it("async open failure rejects with CascError", async () => {
+        const s = new Storage();
+        await expect(s.openAsync("/non/existent/casc/storage")).rejects.toBeInstanceOf(CascError);
       });
     });
   });

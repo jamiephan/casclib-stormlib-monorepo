@@ -46,12 +46,16 @@ This ensures direct correspondence between the C++ API and JavaScript bindings f
 | `SFileGetFileInfo` | `SFileGetFileInfo` | Get archive/file info |
 | `SFileGetLocale` | `SFileGetLocale` | Get locale (static) |
 | `SFileSetLocale` | `SFileSetLocale` | Set locale (static) |
+| N/A (helper) | `openAsync` | Promise-based `SFileOpenArchive` on a libuv worker thread |
+| N/A (helper) | `extractFileAsync` | Promise-based `SFileExtractFile` on a libuv worker thread |
 
 ## File Class Methods (MPQFile)
 
 | C++ Function | JS Binding | Description |
 |---|---|---|
 | `SFileReadFile` | `SFileReadFile` | Read data from file |
+| N/A (helper) | `readFileAll` | Read all file data (helper function) |
+| N/A (helper) | `readAllAsync` | Promise-based `readFileAll` on a libuv worker thread |
 | `SFileWriteFile` | `SFileWriteFile` | Write data to file |
 | `SFileFinishFile` | `SFileFinishFile` | Finish writing file |
 | `SFileGetFileSize` | `SFileGetFileSize` | Get file size |
@@ -103,6 +107,21 @@ archive.close(); // Calls archive.SFileCloseArchive internally
 
 - The low-level bindings (in `lib/bindings.ts`) use exact StormLib.h function names
 - Interfaces are prefixed with `MPQ` (e.g., `MPQArchive`, `MPQFile`) to indicate MPQ archive types
-- The high-level wrapper classes (`Archive` and `File` in `lib/index.ts`) provide simplified method names for better developer experience
-- Tests and documentation use the high-level API, so they don't need changes when updating binding names
+- The high-level wrapper classes (`lib/archive.ts`, `lib/file.ts`) provide simplified method names,
+  Promise-based async variants, static factories (`Archive.open(...)`), and structured `StormError`s
+- Errors thrown by the native layer carry `code` (numeric StormLib error code) and `codeName`
+  (e.g. `"ERROR_FILE_NOT_FOUND"`) properties; the wrapper converts them to `StormError` instances
+- Helper functions not in StormLib.h (like `readFileAll`, `openAsync`) use descriptive camelCase names
 - Constants and flags are exported with their original names (e.g., `MPQ_FILE_COMPRESS`, `MPQ_FILE_ENCRYPTED`)
+
+## TypeScript layer layout
+
+| File | Contents |
+|---|---|
+| `lib/bindings.ts` | Native loader (`node-gyp-build`) + raw binding interfaces |
+| `lib/constants.ts` | MPQ flags / locales / compression constants |
+| `lib/errors.ts` | `StormError`, `StormErrorCode`, native error translation |
+| `lib/archive.ts` | High-level `Archive` class + `withArchive(Async)` |
+| `lib/file.ts` | High-level `File` class |
+| `lib/dispose.ts` | `Symbol.dispose` polyfill for `using` support |
+| `lib/index.ts` | Public entry point re-exporting both layers |

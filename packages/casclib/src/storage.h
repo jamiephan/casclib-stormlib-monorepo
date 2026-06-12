@@ -12,10 +12,13 @@ public:
 
 private:
   static Napi::FunctionReference constructor;
+  friend class OpenStorageWorker;
 
   // Methods
   Napi::Value Open(const Napi::CallbackInfo& info);
   Napi::Value OpenOnline(const Napi::CallbackInfo& info);
+  Napi::Value OpenAsync(const Napi::CallbackInfo& info);
+  Napi::Value OpenOnlineAsync(const Napi::CallbackInfo& info);
   Napi::Value OpenEx(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
