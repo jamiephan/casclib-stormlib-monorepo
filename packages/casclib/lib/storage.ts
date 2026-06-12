@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as nodePath from 'path';
 import {
   CascStorageBinding,
   CascFindData,
@@ -288,6 +289,28 @@ export class Storage {
   }
 
   /**
+   * Read a file from storage as a string on a worker thread
+   * (does not block the event loop).
+   * @param encoding Buffer encoding (default 'utf-8').
+   */
+  async readFileAsStringAsync(filename: string, encoding: BufferEncoding = 'utf-8'): Promise<string> {
+    return (await this.readFileAsync(filename)).toString(encoding);
+  }
+
+  /**
+   * Get the size of a file in storage without reading its contents.
+   * Throws CascError if the file does not exist.
+   */
+  getFileSize(filename: string): number {
+    const file = this.openFile(filename);
+    try {
+      return file.getSize64();
+    } finally {
+      file.close();
+    }
+  }
+
+  /**
    * Extract a file from storage to a path on disk.
    * Returns the number of bytes written.
    */
@@ -327,6 +350,21 @@ export class Storage {
   getTotalFileCount(): number {
     const info = this.getStorageInfo(1 /* CascStorageTotalFileCount */);
     return info.fileCount ?? 0;
+  }
+
+  /**
+   * Get the product code name and build number of the storage.
+   * Convenience wrapper over getStorageInfo(CascStorageProduct).
+   *
+   * @example
+   * ```typescript
+   * const { codeName, buildNumber } = storage.getProductInfo();
+   * // { codeName: 'hero', buildNumber: 93571 }
+   * ```
+   */
+  getProductInfo(): { codeName: string; buildNumber: number } {
+    const info = this.getStorageInfo(4 /* CascStorageProduct */);
+    return { codeName: info.codeName ?? '', buildNumber: info.buildNumber ?? 0 };
   }
 
   // ---------------------------------------------------------------------------
@@ -412,6 +450,105 @@ export class Storage {
     for (const entry of this.files(mask)) {
       if (callback(entry) === false) return;
     }
+  }
+
+  /**
+   * Find all files whose name matches a regular expression.
+   * Enumerates the whole storage and filters client-side — replaces the
+   * manual findFirstFile/findNextFile loop. For simple wildcard patterns,
+   * prefer findAllFiles(mask), which filters natively.
+   *
+   * @example
+   * ```typescript
+   * const maps = storage.findFilesMatching(/\.stormmap$/i);
+   * console.log(`Found ${maps.length} files`);
+   * ```
+   */
+  findFilesMatching(pattern: RegExp, listFile?: string): CascFindData[] {
+    return this.findAllFiles('*', listFile).filter(f => pattern.test(f.fileName));
+  }
+
+  /**
+   * Extract every file matching a CASC mask (string) or regular expression
+   * to a directory, preserving the storage's directory structure.
+   * Files that cannot be extracted (e.g. encrypted without keys) are
+   * skipped and reported in `failed`.
+   *
+   * @param outputDir - Output directory (subdirectories are created as needed)
+   * @param pattern - CASC mask like `"*.txt"` or a RegExp tested against fileName (default: all files)
+   * @returns The file names that were extracted and the ones that failed
+   *
+   * @example
+   * ```typescript
+   * const { extracted, failed } = storage.extractFiles('./out', /\.xml$/i);
+   * console.log(`Extracted ${extracted.length} files (${failed.length} failed)`);
+   * ```
+   */
+  extractFiles(outputDir: string, pattern: string | RegExp = '*'): { extracted: string[]; failed: string[] } {
+    const entries = typeof pattern === 'string'
+      ? this.findAllFiles(pattern)
+      : this.findFilesMatching(pattern);
+    const extracted: string[] = [];
+    const failed: string[] = [];
+    for (const entry of entries) {
+      const destination = Storage.safeDestination(outputDir, entry.fileName);
+      if (!destination) {
+        failed.push(entry.fileName);
+        continue;
+      }
+      try {
+        fs.mkdirSync(nodePath.dirname(destination), { recursive: true });
+        this.extractFile(entry.fileName, destination);
+        extracted.push(entry.fileName);
+      } catch {
+        failed.push(entry.fileName);
+      }
+    }
+    return { extracted, failed };
+  }
+
+  /**
+   * Like extractFiles, but reads and writes on worker threads without
+   * blocking the event loop. Files are extracted sequentially — a storage
+   * handle must not run concurrent operations.
+   */
+  async extractFilesAsync(outputDir: string, pattern: string | RegExp = '*'): Promise<{ extracted: string[]; failed: string[] }> {
+    const entries = typeof pattern === 'string'
+      ? this.findAllFiles(pattern)
+      : this.findFilesMatching(pattern);
+    const extracted: string[] = [];
+    const failed: string[] = [];
+    for (const entry of entries) {
+      const destination = Storage.safeDestination(outputDir, entry.fileName);
+      if (!destination) {
+        failed.push(entry.fileName);
+        continue;
+      }
+      try {
+        await fs.promises.mkdir(nodePath.dirname(destination), { recursive: true });
+        await this.extractFileAsync(entry.fileName, destination);
+        extracted.push(entry.fileName);
+      } catch {
+        failed.push(entry.fileName);
+      }
+    }
+    return { extracted, failed };
+  }
+
+  /**
+   * Map a storage file name to a destination path inside outputDir,
+   * or null if the name would escape it. Storage names come from CASC
+   * metadata and are untrusted: reject `..` segments and drive letters,
+   * then verify the resolved path stays under the output root (zip-slip
+   * guard).
+   */
+  private static safeDestination(outputDir: string, fileName: string): string | null {
+    const parts = fileName.split(/[\\/]+/).filter(p => p && p !== '.');
+    if (parts.length === 0 || parts.some(p => p === '..' || /^[a-zA-Z]:$/.test(p))) return null;
+    const destination = nodePath.resolve(outputDir, ...parts);
+    const root = nodePath.resolve(outputDir) + nodePath.sep;
+    if (!destination.startsWith(root)) return null;
+    return destination;
   }
 
   // ---------------------------------------------------------------------------

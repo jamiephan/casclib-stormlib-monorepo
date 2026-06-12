@@ -198,6 +198,70 @@ export const CCB_COPYING_NON_MPQ_DATA = 3;
 export const CCB_COMPACTING_FILES = 4;
 export const CCB_CLOSING_ARCHIVE = 5;
 
+// Info classes for SFileGetFileInfo / Archive.getFileInfo / File.getFileInfo
+// (values match the SFileInfoClass enum in StormLib.h)
+export enum SFileInfoClass {
+  // Archive-level info classes (use with Archive.getFileInfo)
+  MpqFileName = 0,
+  MpqStreamBitmap = 1,
+  MpqUserDataOffset = 2,
+  MpqUserDataHeader = 3,
+  MpqUserData = 4,
+  MpqHeaderOffset = 5,
+  MpqHeaderSize = 6,
+  MpqHeader = 7,
+  MpqHetTableOffset = 8,
+  MpqHetTableSize = 9,
+  MpqHetHeader = 10,
+  MpqHetTable = 11,
+  MpqBetTableOffset = 12,
+  MpqBetTableSize = 13,
+  MpqBetHeader = 14,
+  MpqBetTable = 15,
+  MpqHashTableOffset = 16,
+  MpqHashTableSize64 = 17,
+  MpqHashTableSize = 18,
+  MpqHashTable = 19,
+  MpqBlockTableOffset = 20,
+  MpqBlockTableSize64 = 21,
+  MpqBlockTableSize = 22,
+  MpqBlockTable = 23,
+  MpqHiBlockTableOffset = 24,
+  MpqHiBlockTableSize64 = 25,
+  MpqHiBlockTable = 26,
+  MpqSignatures = 27,
+  MpqStrongSignatureOffset = 28,
+  MpqStrongSignatureSize = 29,
+  MpqStrongSignature = 30,
+  MpqArchiveSize64 = 31,
+  MpqArchiveSize = 32,
+  MpqMaxFileCount = 33,
+  MpqFileTableSize = 34,
+  MpqSectorSize = 35,
+  MpqNumberOfFiles = 36,
+  MpqRawChunkSize = 37,
+  MpqStreamFlags = 38,
+  MpqFlags = 39,
+  // File-level info classes (use with File.getFileInfo)
+  InfoPatchChain = 40,
+  InfoFileEntry = 41,
+  InfoHashEntry = 42,
+  InfoHashIndex = 43,
+  InfoNameHash1 = 44,
+  InfoNameHash2 = 45,
+  InfoNameHash3 = 46,
+  InfoLocale = 47,
+  InfoFileIndex = 48,
+  InfoByteOffset = 49,
+  InfoFileTime = 50,
+  InfoFileSize = 51,
+  InfoCompressedSize = 52,
+  InfoFlags = 53,
+  InfoEncryptionKey = 54,
+  InfoEncryptionKeyRaw = 55,
+  InfoCRC32 = 56
+}
+
 // Locale constants
 export const LANG_NEUTRAL = 0x00;
 

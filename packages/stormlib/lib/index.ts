@@ -14,7 +14,8 @@ export type {
   ArchiveOpenOptions,
   ArchiveCreateOptions,
   FileOpenOptions,
-  AddFileOptions
+  AddFileOptions,
+  AddBufferOptions
 } from './archive';
 export { File } from './file';
 export { StormError, StormErrorCode } from './errors';

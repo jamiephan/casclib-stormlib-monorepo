@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import {
   MPQArchiveBinding,
@@ -7,6 +8,7 @@ import {
 import { invoke, invokeAsync } from './errors';
 import { kDispose } from './dispose';
 import { File } from './file';
+import { MPQ_FILE_COMPRESS, MPQ_FILE_REPLACEEXISTING, MPQ_COMPRESSION_ZLIB } from './constants';
 
 /**
  * Options for opening an MPQ archive
@@ -44,6 +46,20 @@ export interface AddFileOptions {
   compression?: number;
   /** Compression method for subsequent sectors */
   compressionNext?: number;
+}
+
+/**
+ * Options for adding in-memory data to an archive
+ */
+export interface AddBufferOptions {
+  /** File flags (default: MPQ_FILE_COMPRESS | MPQ_FILE_REPLACEEXISTING) */
+  flags?: number;
+  /** Compression method (default: MPQ_COMPRESSION_ZLIB) */
+  compression?: number;
+  /** File timestamp (default: 0) */
+  fileTime?: number;
+  /** Locale ID (default: 0) */
+  locale?: number;
 }
 
 /**
@@ -113,7 +129,7 @@ export class Archive {
    * Set the locale for archive operations
    * This is a static method that affects all archive operations
    * @param locale - The locale ID to set
-   * @returns The previous locale ID
+   * @returns The locale ID that is now in effect
    */
   static setLocale(locale: number): number {
     return MPQArchiveBinding.SFileSetLocale(locale);
@@ -508,6 +524,21 @@ export class Archive {
     return files ? files.map(f => f.name) : [];
   }
 
+  /**
+   * Find all files whose name matches a regular expression.
+   * Enumerates the whole archive and filters client-side — for simple
+   * wildcard patterns, prefer findFiles(mask), which filters natively.
+   *
+   * @example
+   * ```typescript
+   * const scripts = archive.findFilesMatching(/\.xml$/i);
+   * console.log(`Found ${scripts.length} files`);
+   * ```
+   */
+  findFilesMatching(pattern: RegExp): FileInfo[] {
+    return (this.findFiles('*') || []).filter(f => pattern.test(f.name));
+  }
+
   // ---------------------------------------------------------------------------
   // High-level helpers
   // ---------------------------------------------------------------------------
@@ -558,23 +589,153 @@ export class Archive {
   }
 
   /**
-   * Extract all files from the archive to a directory
-   * @param outputDir - Output directory path
-   * @param mask - File mask to filter (default: "*")
-   * @returns Number of files extracted
+   * Read a file from the archive as a string on a worker thread
+   * (does not block the event loop).
+   * @param filename - Name of the file to read
+   * @param encoding - Text encoding (default: 'utf-8')
+   * @returns The file content as string
    */
-  extractAllFiles(outputDir: string, mask: string = "*"): number {
-    let extracted = 0;
-    for (const fileInfo of this.files(mask)) {
+  async readFileAsStringAsync(filename: string, encoding: BufferEncoding = 'utf-8'): Promise<string> {
+    return (await this.readFileAsync(filename)).toString(encoding);
+  }
+
+  /**
+   * Add in-memory data to the archive as a file. Wraps the
+   * createFile → write → finish sequence so no temp file on disk is needed.
+   * @param archiveName - Name for the file in the archive
+   * @param data - File contents
+   * @param options - Optional flags, compression, fileTime and locale
+   * @returns true if successful
+   *
+   * @example
+   * ```typescript
+   * archive.addBuffer('data/blob.bin', Buffer.from([1, 2, 3]));
+   * ```
+   */
+  addBuffer(archiveName: string, data: Buffer, options?: AddBufferOptions): boolean {
+    const flags = options?.flags ?? (MPQ_FILE_COMPRESS | MPQ_FILE_REPLACEEXISTING);
+    const file = this.createFile(
+      archiveName,
+      options?.fileTime ?? 0,
+      data.length,
+      options?.locale ?? 0,
+      flags
+    );
+    try {
+      if (data.length > 0) {
+        file.write(data, options?.compression ?? MPQ_COMPRESSION_ZLIB);
+      }
+      return file.finish();
+    } catch (err) {
+      try { file.close(); } catch { /* finish/close best effort on failure */ }
+      throw err;
+    }
+  }
+
+  /**
+   * Add a string to the archive as a file.
+   * @param archiveName - Name for the file in the archive
+   * @param text - File contents
+   * @param options - Optional add options; `encoding` defaults to 'utf-8'
+   * @returns true if successful
+   */
+  addString(
+    archiveName: string,
+    text: string,
+    options?: AddBufferOptions & { encoding?: BufferEncoding }
+  ): boolean {
+    return this.addBuffer(archiveName, Buffer.from(text, options?.encoding ?? 'utf-8'), options);
+  }
+
+  /**
+   * Extract every file matching an MPQ mask (string) or regular expression
+   * to a directory, preserving the archive's directory structure.
+   * Files that cannot be extracted are skipped and reported in `failed`.
+   *
+   * @param outputDir - Output directory (subdirectories are created as needed)
+   * @param pattern - Mask like `"*.txt"` or a RegExp tested against the file name (default: all files)
+   * @returns The file names that were extracted and the ones that failed
+   *
+   * @example
+   * ```typescript
+   * const { extracted, failed } = archive.extractFiles('./out', /\.xml$/i);
+   * console.log(`Extracted ${extracted.length} files (${failed.length} failed)`);
+   * ```
+   */
+  extractFiles(outputDir: string, pattern: string | RegExp = "*"): { extracted: string[]; failed: string[] } {
+    const entries = typeof pattern === 'string'
+      ? this.findFiles(pattern) || []
+      : this.findFilesMatching(pattern);
+    const extracted: string[] = [];
+    const failed: string[] = [];
+    for (const fileInfo of entries) {
+      const destination = Archive.safeDestination(outputDir, fileInfo.name);
+      if (!destination) {
+        failed.push(fileInfo.name);
+        continue;
+      }
       try {
-        const outputPath = path.join(outputDir, fileInfo.plainName);
-        this.extractFile(fileInfo.name, outputPath);
-        extracted++;
+        fs.mkdirSync(path.dirname(destination), { recursive: true });
+        this.extractFile(fileInfo.name, destination);
+        extracted.push(fileInfo.name);
       } catch {
-        // Skip files that can't be extracted
+        failed.push(fileInfo.name);
       }
     }
-    return extracted;
+    return { extracted, failed };
+  }
+
+  /**
+   * Like extractFiles, but reads and writes on a worker thread without
+   * blocking the event loop. Files are extracted sequentially —
+   * MPQ handles must not run concurrent operations.
+   */
+  async extractFilesAsync(outputDir: string, pattern: string | RegExp = "*"): Promise<{ extracted: string[]; failed: string[] }> {
+    const entries = typeof pattern === 'string'
+      ? this.findFiles(pattern) || []
+      : this.findFilesMatching(pattern);
+    const extracted: string[] = [];
+    const failed: string[] = [];
+    for (const fileInfo of entries) {
+      const destination = Archive.safeDestination(outputDir, fileInfo.name);
+      if (!destination) {
+        failed.push(fileInfo.name);
+        continue;
+      }
+      try {
+        await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+        await this.extractFileAsync(fileInfo.name, destination);
+        extracted.push(fileInfo.name);
+      } catch {
+        failed.push(fileInfo.name);
+      }
+    }
+    return { extracted, failed };
+  }
+
+  /**
+   * Map an archive file name to a destination path inside outputDir,
+   * or null if the name would escape it. Archive names come from MPQ
+   * metadata and are untrusted: reject `..` segments and drive letters,
+   * then verify the resolved path stays under the output root (zip-slip
+   * guard).
+   */
+  private static safeDestination(outputDir: string, fileName: string): string | null {
+    const parts = fileName.split(/[\\/]+/).filter(p => p && p !== '.');
+    if (parts.length === 0 || parts.some(p => p === '..' || /^[a-zA-Z]:$/.test(p))) return null;
+    const destination = path.resolve(outputDir, ...parts);
+    const root = path.resolve(outputDir) + path.sep;
+    if (!destination.startsWith(root)) return null;
+    return destination;
+  }
+
+  /**
+   * Get the number of files in the archive matching a mask
+   * @param mask - File mask to filter (default: "*")
+   * @returns Number of matching files
+   */
+  getFileCount(mask: string = "*"): number {
+    return this.findFiles(mask)?.length ?? 0;
   }
 
   /**

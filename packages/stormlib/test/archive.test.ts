@@ -387,58 +387,189 @@ describe("File.close()", () => {
   });
 });
 
-// Dummy tests for methods not yet implemented
-describe("Archive.getLocale() and Archive.setLocale() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.getLocale() and Archive.setLocale()", () => {
+  it("should set the locale and report it via getLocale", () => {
+    const original = Archive.getLocale();
+    try {
+      // SFileSetLocale returns the locale now in effect
+      expect(Archive.setLocale(0x409)).toBe(0x409);
+      expect(Archive.getLocale()).toBe(0x409);
+    } finally {
+      Archive.setLocale(original);
+    }
+    expect(Archive.getLocale()).toBe(original);
   });
 });
 
-describe("Archive.open() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.open()", () => {
+  it("should open an existing archive", () => {
+    const testDir = getTestDir("open-existing");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "content");
+    const archivePath = path.join(testDir, "test.mpq");
+    const creator = new Archive();
+    creator.create(archivePath);
+    creator.addFile(sourceFile, "test.txt");
+    creator.close();
+
+    const archive = new Archive();
+    archive.open(archivePath);
+    expect(archive.isOpen).toBe(true);
+    expect(archive.hasFile("test.txt")).toBe(true);
+    archive.close();
+  });
+
+  it("should throw when opening a non-existent archive", () => {
+    const archive = new Archive();
+    expect(() => {
+      archive.open(path.join(getTestDir("open-missing"), "missing.mpq"));
+    }).toThrow();
   });
 });
 
-describe("Archive.openFile() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.openFile()", () => {
+  it("should open an existing file and read it", () => {
+    const testDir = getTestDir("openfile");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "openFile content");
+    const archivePath = path.join(testDir, "test.mpq");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+
+    const file = archive.openFile("test.txt");
+    expect(file).toBeInstanceOf(File);
+    expect(file.readAll().toString()).toBe("openFile content");
+    file.close();
+    archive.close();
+  });
+
+  it("should throw when opening a missing file", () => {
+    const testDir = getTestDir("openfile-missing");
+    ensureDir(testDir);
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+    expect(() => archive.openFile("missing.txt")).toThrow();
+    archive.close();
   });
 });
 
-describe("Archive.hasFile() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.hasFile()", () => {
+  it("should report file existence", () => {
+    const testDir = getTestDir("hasfile");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "content");
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+    archive.addFile(sourceFile, "present.txt");
+
+    expect(archive.hasFile("present.txt")).toBe(true);
+    expect(archive.hasFile("absent.txt")).toBe(false);
+    expect(archive.fileExists("present.txt")).toBe(true);
+    archive.close();
   });
 });
 
-describe("Archive.addFileEx() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.addFileEx()", () => {
+  it("should add a file with explicit compression settings", () => {
+    const testDir = getTestDir("addfileex");
+    ensureDir(testDir);
+    const content = "Compressible content. ".repeat(100);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, content);
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+
+    const result = archive.addFileEx(
+      sourceFile,
+      "compressed.txt",
+      0x00000200, // MPQ_FILE_COMPRESS
+      0x02, // MPQ_COMPRESSION_ZLIB
+      0x02
+    );
+    expect(result).toBe(true);
+    expect(archive.readFileAsString("compressed.txt")).toBe(content);
+    archive.close();
+  });
+
+  it("addFile with compression options should route through SFileAddFileEx", () => {
+    const testDir = getTestDir("addfile-compression");
+    ensureDir(testDir);
+    const content = "Routed through SFileAddFileEx";
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, content);
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+
+    const result = archive.addFile(sourceFile, "routed.txt", {
+      flags: 0x00000200, // MPQ_FILE_COMPRESS
+      compression: 0x02 // MPQ_COMPRESSION_ZLIB
+    });
+    expect(result).toBe(true);
+    expect(archive.readFileAsString("routed.txt")).toBe(content);
+    archive.close();
   });
 });
 
-describe("Archive.setAttributes() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.setAttributes()", () => {
+  it("should set attributes flags", () => {
+    const testDir = getTestDir("set-attributes");
+    ensureDir(testDir);
+    const archive = new Archive();
+    // MPQ_CREATE_ATTRIBUTES so the archive carries an (attributes) file
+    archive.create(path.join(testDir, "test.mpq"), { flags: 0x00200000 });
+    const result = archive.setAttributes(0x00000001); // MPQ_ATTRIBUTE_CRC32
+    expect(result).toBe(true);
+    expect(archive.getAttributes() & 0x00000001).toBe(0x00000001);
+    archive.close();
   });
 });
 
-describe("Archive.verifyFile() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+describe("Archive.verifyFile()", () => {
+  it("should verify a file without errors", () => {
+    const testDir = getTestDir("verify-file");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "verify me");
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+    archive.addFile(sourceFile, "test.txt");
+
+    const result = archive.verifyFile("test.txt", 0x0000000F); // SFILE_VERIFY_ALL
+    expect(typeof result).toBe("number");
+    // No open/read errors expected (VERIFY_OPEN_ERROR | VERIFY_READ_ERROR)
+    expect(result & 0x0003).toBe(0);
+    archive.close();
   });
 });
 
-describe("Archive.verifyArchive() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
-  });
-});
+describe("File.getPosition() and File.setPosition()", () => {
+  it("should track and move the file pointer", () => {
+    const testDir = getTestDir("file-position");
+    ensureDir(testDir);
+    const content = "0123456789ABCDEF";
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, content);
+    const archivePath = path.join(testDir, "test.mpq");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+    archive.close();
 
-describe("File.getPosition() and File.setPosition() - TODO", () => {
-  it("should be implemented in the future", () => {
-    expect(true).toBe(true);
+    archive.open(archivePath);
+    const file = archive.openFile("test.txt");
+    expect(file.getPosition()).toBe(0);
+
+    const newPos = file.setPosition(10);
+    expect(newPos).toBe(10);
+    expect(file.getPosition()).toBe(10);
+    expect(file.read(6).toString()).toBe("ABCDEF");
+
+    file.close();
+    archive.close();
   });
 });
 
