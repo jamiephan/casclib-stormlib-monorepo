@@ -193,7 +193,7 @@ jobs:
           CI: true
 
       - name: Upload prebuild
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: prebuilds-${{ runner.os }}-${{ matrix.arch }}
           path: packages/${{ needs.validate.outputs.package }}/prebuilds/**/*
@@ -253,7 +253,7 @@ jobs:
         run: pnpm run build
 
       - name: Download all prebuilds
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: prebuilds-*
@@ -309,7 +309,7 @@ jobs:
 
       - name: Upload tarball (dry run)
         if: ${{ inputs.dry_run }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: npm-tarball
           path: packages/${{ needs.validate.outputs.package }}/*.tgz
@@ -363,7 +363,7 @@ jobs:
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
           name: '@jamiephan/${{ needs.validate.outputs.package }} v${{ needs.validate.outputs.version }}'
@@ -396,7 +396,7 @@ jobs:
 
       - name: Comment on released PRs
         if: ${{ !inputs.dry_run && steps.history.outputs.pr_numbers != '' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           PR_NUMBERS: ${{ steps.history.outputs.pr_numbers }}
         with:
