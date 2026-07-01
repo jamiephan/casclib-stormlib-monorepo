@@ -21,8 +21,8 @@ importers:
   packages/casclib:
     dependencies:
       node-addon-api:
-        specifier: ^8.8.0
-        version: 8.8.0
+        specifier: ^8.9.0
+        version: 8.9.0
       node-gyp-build:
         specifier: ^4.8.0
         version: 4.8.4
@@ -55,8 +55,8 @@ importers:
   packages/stormlib:
     dependencies:
       node-addon-api:
-        specifier: ^8.8.0
-        version: 8.8.0
+        specifier: ^8.9.0
+        version: 8.9.0
       node-gyp-build:
         specifier: ^4.8.0
         version: 4.8.4
@@ -1055,8 +1055,8 @@ packages:
     resolution: {integrity: sha512-KdHvFWZjEKDf0cakgFjebl371GPsISX2oZHcuyKqM7DtogIsHrqKeLTo8wBHxaXRAQlY2PsPlZmfo+9ZCxEREQ==}
     engines: {node: '>=10'}
 
-  node-addon-api@8.8.0:
-    resolution: {integrity: sha512-c5Ko1fZJIJmzhFIkhRN76WTq+fC6tWnGy9CXA0fA+XygsWZmEwG8vmbkNqxMyoaa0Tin4djul49NzdVcJJcjeA==}
+  node-addon-api@8.9.0:
+    resolution: {integrity: sha512-ekZMeaaIzSQTSpr7X2X3iJM7lTzgnx8ahAG9pJfT/7+14mlEM8ZYQ9cgCDvSSRbReFK0oHli3WrZdCiRsgAT9Q==}
     engines: {node: ^18 || ^20 || >= 21}
 
   node-gyp-build@4.8.4:
@@ -2723,7 +2723,7 @@ snapshots:
     dependencies:
       semver: 7.8.4
 
-  node-addon-api@8.8.0: {}
+  node-addon-api@8.9.0: {}
 
   node-gyp-build@4.8.4: {}
 
