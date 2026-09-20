@@ -456,6 +456,113 @@ describe("Archive.openFile()", () => {
   });
 });
 
+describe("Archive.openFileArchive() / openFileArchiveAsync()", () => {
+  // Builds a parent.mpq containing child.mpq (itself a valid MPQ with its
+  // own file) as a regular archive member, and returns the parent's path.
+  const buildNestedArchives = (testDir: string): string => {
+    ensureDir(testDir);
+    const childPath = path.join(testDir, "child.mpq");
+    const child = new Archive();
+    child.create(childPath);
+    const nestedSource = path.join(testDir, "nested-source.txt");
+    createTestFile(nestedSource, "nested content");
+    child.addFile(nestedSource, "nested.txt");
+    child.close();
+
+    const parentPath = path.join(testDir, "parent.mpq");
+    const parent = new Archive();
+    parent.create(parentPath);
+    parent.addFile(childPath, "child.mpq");
+    parent.close();
+
+    return parentPath;
+  };
+
+  it("should open a nested MPQ archive stored as a file", () => {
+    const testDir = getTestDir("openfilearchive");
+    const parentPath = buildNestedArchives(testDir);
+
+    const parent = new Archive();
+    parent.open(parentPath);
+    const nested = parent.openFileArchive("child.mpq");
+    expect(nested).toBeInstanceOf(Archive);
+    expect(nested.isOpen).toBe(true);
+    expect(nested.hasFile("nested.txt")).toBe(true);
+    expect(nested.readFileAsString("nested.txt")).toBe("nested content");
+
+    nested.close();
+    parent.close();
+  });
+
+  it("should open a nested MPQ archive on a worker thread", async () => {
+    const testDir = getTestDir("openfilearchive-async");
+    const parentPath = buildNestedArchives(testDir);
+
+    const parent = new Archive();
+    parent.open(parentPath);
+    const nested = await parent.openFileArchiveAsync("child.mpq");
+    expect(nested.isOpen).toBe(true);
+    expect(nested.readFileAsString("nested.txt")).toBe("nested content");
+
+    nested.close();
+    parent.close();
+  });
+
+  it("should throw when the nested file is not a valid archive", () => {
+    const testDir = getTestDir("openfilearchive-invalid");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "not an archive");
+    const parentPath = path.join(testDir, "parent.mpq");
+    const parent = new Archive();
+    parent.create(parentPath);
+    parent.addFile(sourceFile, "notanarchive.mpq");
+
+    expect(() => parent.openFileArchive("notanarchive.mpq")).toThrow();
+    parent.close();
+  });
+
+  it("closing the parent archive independently should not affect the nested archive", () => {
+    const testDir = getTestDir("openfilearchive-independent-close");
+    const parentPath = buildNestedArchives(testDir);
+
+    const parent = new Archive();
+    parent.open(parentPath);
+    const nested = parent.openFileArchive("child.mpq");
+
+    parent.close();
+    expect(nested.readFileAsString("nested.txt")).toBe("nested content");
+    nested.close();
+  });
+});
+
+describe("File.getArchive()", () => {
+  it("should return the archive that owns the open file", () => {
+    const testDir = getTestDir("file-getarchive");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "owned content");
+    const archivePath = path.join(testDir, "test.mpq");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+
+    const file = archive.openFile("test.txt");
+    const owner = file.getArchive();
+    expect(owner).toBeInstanceOf(Archive);
+    expect(owner.isOpen).toBe(true);
+    expect(owner.readFileAsString("test.txt")).toBe("owned content");
+
+    // The returned Archive is a borrowed reference: closing it must not
+    // close the handle the original `archive` still relies on.
+    owner.close();
+    expect(archive.readFileAsString("test.txt")).toBe("owned content");
+
+    file.close();
+    archive.close();
+  });
+});
+
 describe("Archive.hasFile()", () => {
   it("should report file existence", () => {
     const testDir = getTestDir("hasfile");

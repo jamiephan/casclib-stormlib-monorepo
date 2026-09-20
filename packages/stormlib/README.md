@@ -743,6 +743,34 @@ Opens a file from the archive.
 const file = archive.openFile('war3map.j');
 ```
 
+##### `openFileArchive(fileName: string, options?: FileArchiveOpenOptions): Archive`
+Opens an MPQ archive that is itself stored as a file inside this archive (a nested/embedded archive), e.g. a patch or DLC archive shipped inside a base MPQ.
+
+**Parameters:**
+- `fileName`: Name of the nested archive file within this archive
+- `options`: Optional opening options
+  - `priority`: Archive priority (used when the nested archive participates in a patch chain)
+  - `flags`: Open flags (number)
+
+**Returns:** A new, independently-owned `Archive` for the nested MPQ — close it separately from the archive it was opened from.
+
+**Example:**
+```typescript
+const archive = Archive.open('/path/to/base.mpq');
+const nested = archive.openFileArchive('patch.mpq');
+console.log(nested.listFiles());
+nested.close();
+archive.close();
+```
+
+##### `openFileArchiveAsync(fileName: string, options?: FileArchiveOpenOptions): Promise<Archive>`
+Worker-thread variant of `openFileArchive()` — does not block the event loop.
+
+**Example:**
+```typescript
+const nested = await archive.openFileArchiveAsync('patch.mpq');
+```
+
 ##### `hasFile(filename: string): boolean`
 Checks if a file exists in the archive.
 
@@ -1013,6 +1041,20 @@ Gets file information.
 **Example:**
 ```typescript
 const info = file.getFileInfo(0);
+```
+
+##### `getArchive(): Archive`
+Gets the archive that owns this open file.
+
+The returned `Archive` is a *borrowed* reference: it shares the underlying handle with whichever archive originally served this file (the archive it was opened from, or a patch archive in its chain). Calling `close()` on it is a safe no-op — the handle stays owned by the original opener either way.
+
+**Returns:** The owning `Archive`
+
+**Example:**
+```typescript
+const file = archive.openFile('war3map.j');
+const owner = file.getArchive();
+console.log(owner.listFiles());
 ```
 
 #### Utility Methods

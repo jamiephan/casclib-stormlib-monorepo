@@ -37,6 +37,16 @@ export interface FileOpenOptions {
 }
 
 /**
+ * Options for opening a nested MPQ archive stored as a file inside another archive
+ */
+export interface FileArchiveOpenOptions {
+  /** Archive priority (used when the nested archive participates in a patch chain) */
+  priority?: number;
+  /** Open flags */
+  flags?: number;
+}
+
+/**
  * Options for adding a file to archive
  */
 export interface AddFileOptions {
@@ -76,8 +86,14 @@ export class Archive {
   private archive: MPQArchive;
   private opened = false;
 
-  constructor() {
-    this.archive = new MPQArchiveBinding();
+  /**
+   * @param archive - @internal — wraps an already-open native archive (used
+   * by `openFileArchive()` / `openFileArchiveAsync()`). Omit to create a
+   * fresh, unopened Archive via the usual `open()`/`create()` calls.
+   */
+  constructor(archive?: MPQArchive) {
+    this.archive = archive ?? new MPQArchiveBinding();
+    this.opened = archive !== undefined;
   }
 
   // ---------------------------------------------------------------------------
@@ -211,6 +227,34 @@ export class Archive {
   openFile(filename: string, options?: FileOpenOptions): File {
     const file = invoke(() => this.archive.SFileOpenFileEx(filename, options?.flags || 0));
     return new File(file);
+  }
+
+  /**
+   * Open an MPQ archive that is itself stored as a file inside this archive
+   * (a nested/embedded archive). The returned Archive owns an independent
+   * handle — close it separately from the archive it was opened from.
+   * @param fileName - Name of the nested archive file within this archive
+   * @param options - Optional priority and open flags
+   * @returns A new, independently-owned Archive for the nested MPQ
+   */
+  openFileArchive(fileName: string, options?: FileArchiveOpenOptions): Archive {
+    const nested = invoke(() => this.archive.SFileOpenFileArchive(
+      fileName, options?.priority || 0, options?.flags || 0
+    ));
+    return new Archive(nested);
+  }
+
+  /**
+   * Open a nested MPQ archive on a worker thread (does not block the event loop).
+   * @param fileName - Name of the nested archive file within this archive
+   * @param options - Optional priority and open flags
+   * @returns A new, independently-owned Archive for the nested MPQ
+   */
+  async openFileArchiveAsync(fileName: string, options?: FileArchiveOpenOptions): Promise<Archive> {
+    const nested = await invokeAsync(this.archive.openFileArchiveAsync(
+      fileName, options?.priority || 0, options?.flags || 0
+    ));
+    return new Archive(nested);
   }
 
   /**
