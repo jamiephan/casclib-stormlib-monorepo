@@ -252,6 +252,24 @@ describe("CascOpenLocalFile (offline)", () => {
     (file as any)[(Symbol as any).dispose]();
     expect(file.close()).toBe(false);
   });
+
+  it("setFileFlags() sets flags on the open file", () => {
+    const localPath = path.join(TEST_DIR, "local-file-flags.bin");
+    fs.writeFileSync(localPath, "not a BLTE file");
+    const file = new File(CascOpenLocalFile(localPath));
+    expect(typeof file.setFileFlags(0)).toBe("boolean");
+    file.close();
+  });
+
+  it("read() defaults bytesToRead to 4096 when omitted", () => {
+    const localPath = path.join(TEST_DIR, "local-file-read-default.bin");
+    fs.writeFileSync(localPath, "not a BLTE file");
+    const file = new File(CascOpenLocalFile(localPath));
+    // Reads on a non-BLTE file fail, but that still exercises the
+    // `bytesToRead || 4096` default-value branch before the native call.
+    expect(() => file.read()).toThrow();
+    file.close();
+  });
 });
 
 describe("Constants (offline)", () => {
@@ -259,5 +277,156 @@ describe("Constants (offline)", () => {
     expect(FILE_BEGIN).toBe(0);
     expect(FILE_CURRENT).toBe(1);
     expect(FILE_END).toBe(2);
+  });
+
+  it("CASCLIB_VERSION falls back to 0x0300 when the native addon doesn't export it", () => {
+    jest.resetModules();
+    jest.doMock("../lib/bindings", () => ({ native: {} }));
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const constants = require("../lib/constants");
+      expect(constants.CASCLIB_VERSION).toBe(0x0300);
+    } finally {
+      jest.dontMock("../lib/bindings");
+      jest.resetModules();
+    }
+  });
+});
+
+describe("dispose.ts Symbol.dispose polyfill (offline)", () => {
+  it("defines Symbol.dispose when the runtime doesn't already have it", () => {
+    // Symbol.dispose itself is a non-configurable, non-writable property on
+    // the real Symbol object, so it cannot be deleted to simulate an older
+    // runtime. Swap the global Symbol binding (which IS writable) for a
+    // stand-in that lacks .dispose instead.
+    const RealSymbol = (globalThis as any).Symbol;
+    const fakeSymbol: any = (...args: unknown[]) => RealSymbol(...args);
+    fakeSymbol.for = RealSymbol.for.bind(RealSymbol);
+    (globalThis as any).Symbol = fakeSymbol;
+    jest.resetModules();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { kDispose } = require("../lib/dispose");
+      expect(fakeSymbol.dispose).toBe(kDispose);
+    } finally {
+      (globalThis as any).Symbol = RealSymbol;
+      jest.resetModules();
+    }
+  });
+});
+
+describe("Storage extractFiles error handling (offline)", () => {
+  const fakeEntry = (fileName: string) => ({ fileName } as any);
+
+  it("extractFiles() reports a file as failed when extraction throws", () => {
+    const storage = new Storage();
+    jest.spyOn(storage, "findAllFiles").mockReturnValue([fakeEntry("broken.txt")]);
+    jest.spyOn(storage, "extractFile").mockImplementation(() => {
+      throw new CascError("extraction failed");
+    });
+    try {
+      const { extracted, failed } = storage.extractFiles(path.join(TEST_DIR, "extract-fail"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual(["broken.txt"]);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it("extractFilesAsync() reports a file as failed when extraction throws", async () => {
+    const storage = new Storage();
+    jest.spyOn(storage, "findAllFiles").mockReturnValue([fakeEntry("broken.txt")]);
+    jest.spyOn(storage, "extractFileAsync").mockImplementation(async () => {
+      throw new CascError("extraction failed");
+    });
+    try {
+      const { extracted, failed } = await storage.extractFilesAsync(path.join(TEST_DIR, "extract-fail-async"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual(["broken.txt"]);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it("extractFilesAsync() accepts a RegExp pattern", async () => {
+    const storage = new Storage();
+    jest.spyOn(storage, "findFilesMatching").mockReturnValue([fakeEntry("match.txt")]);
+    jest.spyOn(storage, "extractFileAsync").mockImplementation(async () => 1);
+    try {
+      const { extracted, failed } = await storage.extractFilesAsync(path.join(TEST_DIR, "extract-regex-async"), /match/);
+      expect(extracted).toEqual(["match.txt"]);
+      expect(failed).toEqual([]);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  // Drive-relative Windows paths (e.g. "D:evil.txt") pass the `..`/drive-letter
+  // segment filter (the regex requires an exact "X:" segment) but still
+  // resolve outside outputDir once path.resolve() applies drive semantics —
+  // this is what the second, resolved-path check in safeDestination() catches.
+  (process.platform === "win32" ? it : it.skip)(
+    "extractFiles() rejects a Windows drive-relative path that escapes the output root",
+    () => {
+      const storage = new Storage();
+      jest.spyOn(storage, "findAllFiles").mockReturnValue([fakeEntry("D:evil.txt")]);
+      const extractSpy = jest.spyOn(storage, "extractFile").mockReturnValue(1);
+      try {
+        const { extracted, failed } = storage.extractFiles(path.join(TEST_DIR, "extract-drive-escape"));
+        expect(failed).toEqual(["D:evil.txt"]);
+        expect(extracted).toEqual([]);
+        expect(extractSpy).not.toHaveBeenCalled();
+      } finally {
+        jest.restoreAllMocks();
+      }
+    }
+  );
+});
+
+describe("Storage file enumeration defaults and fallbacks (offline)", () => {
+  it("files()/findAllFiles()/getFileNames() default the mask to '*' and stop on an empty result", () => {
+    const storage = new Storage();
+    const findFirstSpy = jest.spyOn(storage, "findFirstFile").mockReturnValue(null);
+    try {
+      expect([...storage.files()]).toEqual([]);
+      expect(findFirstSpy).toHaveBeenCalledWith("*", undefined);
+      expect(storage.findAllFiles()).toEqual([]);
+      expect(storage.getFileNames()).toEqual([]);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it("getTotalFileCount() falls back to 0 when fileCount is missing", () => {
+    const storage = new Storage();
+    jest.spyOn(storage, "getStorageInfo").mockReturnValue({});
+    try {
+      expect(storage.getTotalFileCount()).toBe(0);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  it("getProductInfo() falls back to an empty codeName and 0 buildNumber", () => {
+    const storage = new Storage();
+    jest.spyOn(storage, "getStorageInfo").mockReturnValue({});
+    try {
+      expect(storage.getProductInfo()).toEqual({ codeName: "", buildNumber: 0 });
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+});
+
+describe("Storage [Symbol.iterator] (offline)", () => {
+  it("iterating a Storage yields every file from files()", () => {
+    const storage = new Storage();
+    const entries = [{ fileName: "a.txt" }, { fileName: "b.txt" }];
+    jest.spyOn(storage, "files").mockReturnValue(entries[Symbol.iterator]() as any);
+    try {
+      expect([...storage]).toEqual(entries);
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 });

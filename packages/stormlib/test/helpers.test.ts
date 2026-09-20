@@ -186,6 +186,20 @@ describe("Archive.findFilesMatching()", () => {
       archive.close();
     }
   });
+
+  it("returns an empty array when the archive has no files at all", () => {
+    // Unlike a no-match regex on a populated archive, an empty archive makes
+    // findFiles('*') itself return null, exercising findFilesMatching's own
+    // `|| []` fallback rather than just Array.prototype.filter on [].
+    const testDir = getTestDir("find-matching-empty");
+    ensureDir(testDir);
+    const archive = Archive.create(path.join(testDir, "test.mpq"));
+    try {
+      expect(archive.findFilesMatching(/anything/)).toEqual([]);
+    } finally {
+      archive.close();
+    }
+  });
 });
 
 describe("Archive.extractFiles() / extractFilesAsync()", () => {
@@ -212,6 +226,33 @@ describe("Archive.extractFiles() / extractFilesAsync()", () => {
     }
   });
 
+  it("extractFiles accepts a RegExp pattern", () => {
+    const archivePath = buildArchive("extract-files-regex", files);
+    const outDir = path.join(getTestDir("extract-files-regex"), "out");
+    const archive = Archive.open(archivePath);
+    try {
+      const { extracted, failed } = archive.extractFiles(outDir, /\.txt$/i);
+      expect(extracted.length).toBe(3);
+      expect(failed).toEqual([]);
+      expect(fs.readFileSync(path.join(outDir, "a.txt"), "utf-8")).toBe("Content A");
+    } finally {
+      archive.close();
+    }
+  });
+
+  it("extractFiles() on an archive with no matches returns empty extracted/failed arrays", () => {
+    const testDir = getTestDir("extract-files-empty");
+    ensureDir(testDir);
+    const archive = Archive.create(path.join(testDir, "test.mpq"));
+    try {
+      const { extracted, failed } = archive.extractFiles(path.join(testDir, "out"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual([]);
+    } finally {
+      archive.close();
+    }
+  });
+
   it("extractFilesAsync accepts a RegExp and matches the sync variant", async () => {
     const archivePath = buildArchive("extract-files-async", files);
     const outDir = path.join(getTestDir("extract-files-async"), "out");
@@ -222,6 +263,19 @@ describe("Archive.extractFiles() / extractFilesAsync()", () => {
       expect(failed).toEqual([]);
       expect(fs.readFileSync(path.join(outDir, "a.txt"), "utf-8")).toBe("Content A");
       expect(fs.readFileSync(path.join(outDir, "sub", "c.txt"), "utf-8")).toBe("Content C");
+    } finally {
+      archive.close();
+    }
+  });
+
+  it("extractFilesAsync() on an archive with no matches returns empty extracted/failed arrays", async () => {
+    const testDir = getTestDir("extract-files-empty-async");
+    ensureDir(testDir);
+    const archive = Archive.create(path.join(testDir, "test.mpq"));
+    try {
+      const { extracted, failed } = await archive.extractFilesAsync(path.join(testDir, "out"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual([]);
     } finally {
       archive.close();
     }
@@ -243,6 +297,75 @@ describe("Archive.extractFiles() / extractFilesAsync()", () => {
       expect(fs.existsSync(path.join(testDir, "evil.txt"))).toBe(false);
     } finally {
       archive.close();
+    }
+  });
+
+  it("extractFilesAsync rejects archive names that would escape the output directory", async () => {
+    const testDir = getTestDir("extract-files-guard-async");
+    ensureDir(testDir);
+    const outDir = path.join(testDir, "out");
+    const archive = Archive.create(path.join(testDir, "test.mpq"), { maxFileCount: 100 });
+    try {
+      expect(archive.addString("..\\evil.txt", "escape attempt")).toBe(true);
+      expect(archive.addString("safe.txt", "fine")).toBe(true);
+      const { extracted, failed } = await archive.extractFilesAsync(outDir, "*.txt");
+      expect(failed).toContain("..\\evil.txt");
+      expect(extracted).toContain("safe.txt");
+      expect(fs.existsSync(path.join(outDir, "safe.txt"))).toBe(true);
+      expect(fs.existsSync(path.join(testDir, "evil.txt"))).toBe(false);
+    } finally {
+      archive.close();
+    }
+  });
+
+  it("extractFiles() reports a file as failed when extraction throws", () => {
+    const archive = new Archive();
+    jest.spyOn(archive, "findFiles").mockReturnValue([{ name: "broken.txt" } as any]);
+    jest.spyOn(archive, "extractFile").mockImplementation(() => {
+      throw new StormError("extraction failed");
+    });
+    try {
+      const { extracted, failed } = archive.extractFiles(getTestDir("extract-files-throw"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual(["broken.txt"]);
+    } finally {
+      jest.restoreAllMocks();
+    }
+  });
+
+  // Drive-relative Windows paths (e.g. "D:evil.txt") pass the `..`/drive-letter
+  // segment filter (the regex requires an exact "X:" segment) but still
+  // resolve outside outputDir once path.resolve() applies drive semantics —
+  // this is what the second, resolved-path check in safeDestination() catches.
+  (process.platform === "win32" ? it : it.skip)(
+    "extractFiles() rejects a Windows drive-relative path that escapes the output root",
+    () => {
+      const archive = new Archive();
+      jest.spyOn(archive, "findFiles").mockReturnValue([{ name: "D:evil.txt" } as any]);
+      const extractSpy = jest.spyOn(archive, "extractFile").mockReturnValue(true);
+      try {
+        const { extracted, failed } = archive.extractFiles(getTestDir("extract-drive-escape"));
+        expect(failed).toEqual(["D:evil.txt"]);
+        expect(extracted).toEqual([]);
+        expect(extractSpy).not.toHaveBeenCalled();
+      } finally {
+        jest.restoreAllMocks();
+      }
+    }
+  );
+
+  it("extractFilesAsync() reports a file as failed when extraction throws", async () => {
+    const archive = new Archive();
+    jest.spyOn(archive, "findFiles").mockReturnValue([{ name: "broken.txt" } as any]);
+    jest.spyOn(archive, "extractFileAsync").mockImplementation(async () => {
+      throw new StormError("extraction failed");
+    });
+    try {
+      const { extracted, failed } = await archive.extractFilesAsync(getTestDir("extract-files-throw-async"));
+      expect(extracted).toEqual([]);
+      expect(failed).toEqual(["broken.txt"]);
+    } finally {
+      jest.restoreAllMocks();
     }
   });
 });
@@ -483,6 +606,8 @@ describe("Archive.addWave()", () => {
       expect(archive.readFile("medium.wav").length).toBe(wav.length);
       // Quality 0 is lossless
       expect(archive.readFile("high.wav").equals(wav)).toBe(true);
+      // Omitting quality exercises its default value (1)
+      expect(archive.addWave(wavPath, "default-quality.wav")).toBe(true);
     } finally {
       archive.close();
     }
