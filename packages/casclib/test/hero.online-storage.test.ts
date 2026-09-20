@@ -423,6 +423,10 @@ describe("CascLib - Heroes of the Storm (hero)", () => {
         expect(found!.equals(key)).toBe(true);
       });
 
+      it("addEncryptionKey rejects a key buffer shorter than 16 bytes", () => {
+        expect(() => helperStorage.addEncryptionKey(0x99887766, Buffer.alloc(4))).toThrow();
+      });
+
       it("addStringEncryptionKey registers a hex-string key", () => {
         expect(
           helperStorage.addStringEncryptionKey(0x66778899, "FFEEDDCCBBAA99887766554433221100")

@@ -592,6 +592,13 @@ Napi::Value CascStorage::AddEncryptionKey(const Napi::CallbackInfo& info) {
   }
 
   Napi::Buffer<BYTE> keyBuffer = info[1].As<Napi::Buffer<BYTE>>();
+
+  if (keyBuffer.Length() < CASC_KEY_LENGTH) {
+    Napi::TypeError::New(env, "Key must be at least 16 bytes")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
   LPBYTE key = keyBuffer.Data();
 
   bool result = CascAddEncryptionKey(hStorage, keyName, key);
