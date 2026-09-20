@@ -12,6 +12,11 @@
 class MpqArchive : public Napi::ObjectWrap<MpqArchive> {
 public:
   static Napi::Object Init(Napi::Env env, Napi::Object exports);
+  // Wraps an already-open archive handle (e.g. from SFileOpenFileArchive or
+  // SFileGetFileArchive). When `owned` is false, Close()/the destructor will
+  // not call SFileCloseArchive — the handle is borrowed from its original
+  // opener and closing it here would be a double-close.
+  static Napi::Object NewInstance(Napi::Env env, HANDLE hMpq, bool owned);
   MpqArchive(const Napi::CallbackInfo& info);
   ~MpqArchive();
 
@@ -19,6 +24,7 @@ private:
   static Napi::FunctionReference constructor;
   friend class OpenArchiveWorker;
   friend class ExtractFileWorker;
+  friend class OpenFileArchiveWorker;
 
   // Archive operations
   Napi::Value Open(const Napi::CallbackInfo& info);
@@ -30,6 +36,8 @@ private:
 
   // File operations
   Napi::Value OpenFile(const Napi::CallbackInfo& info);
+  Napi::Value OpenFileArchive(const Napi::CallbackInfo& info);
+  Napi::Value OpenFileArchiveAsync(const Napi::CallbackInfo& info);
   Napi::Value HasFile(const Napi::CallbackInfo& info);
   Napi::Value ExtractFile(const Napi::CallbackInfo& info);
   Napi::Value ExtractFileAsync(const Napi::CallbackInfo& info);
@@ -76,6 +84,7 @@ private:
   // Member variables
   HANDLE hMpq;
   bool isOpen;
+  bool owned = true;
 };
 
 #endif // STORMLIB_ARCHIVE_H

@@ -27,6 +27,7 @@ private:
   Napi::Value GetFileName(const Napi::CallbackInfo& info);
   Napi::Value SetLocale(const Napi::CallbackInfo& info);
   Napi::Value GetFileInfo(const Napi::CallbackInfo& info);
+  Napi::Value GetFileArchive(const Napi::CallbackInfo& info);
   Napi::Value Close(const Napi::CallbackInfo& info);
 
   // Member variables

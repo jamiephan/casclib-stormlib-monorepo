@@ -48,6 +48,49 @@ private:
   DWORD errorCode;
 };
 
+// Opens a nested MPQ archive (one stored as a file inside another MPQ) off
+// the event loop. The resulting handle is independently owned by the new
+// Archive object returned in OnOK.
+class OpenFileArchiveWorker : public Napi::AsyncWorker {
+public:
+  OpenFileArchiveWorker(Napi::Env env, Napi::Object receiver, HANDLE hParentMpq,
+                        std::string fileName, DWORD priority, DWORD flags)
+    : Napi::AsyncWorker(env, "stormlib:openFileArchiveAsync"),
+      deferred(Napi::Promise::Deferred::New(env)),
+      receiverRef(Napi::Persistent(receiver)),
+      hParentMpq(hParentMpq), fileName(std::move(fileName)),
+      priority(priority), flags(flags), hMpq(nullptr), errorCode(0) {}
+
+  void Execute() override {
+    if (!SFileOpenFileArchive(hParentMpq, fileName.c_str(), priority, flags, &hMpq)) {
+      errorCode = SErrGetLastError();
+      SetError("Failed to open nested MPQ archive: " + fileName);
+    }
+  }
+
+  void OnOK() override {
+    deferred.Resolve(MpqArchive::NewInstance(Env(), hMpq, true));
+  }
+
+  void OnError(const Napi::Error& e) override {
+    std::string message = e.Message() + " (StormError=" + std::to_string(errorCode) +
+                          " " + StormErrorName(errorCode) + ")";
+    deferred.Reject(MakeStormError(Env(), message, errorCode).Value());
+  }
+
+  Napi::Promise Promise() { return deferred.Promise(); }
+
+private:
+  Napi::Promise::Deferred deferred;
+  Napi::ObjectReference receiverRef;
+  HANDLE hParentMpq;
+  std::string fileName;
+  DWORD priority;
+  DWORD flags;
+  HANDLE hMpq;
+  DWORD errorCode;
+};
+
 // Extracts a file from the archive to disk off the event loop.
 class ExtractFileWorker : public Napi::AsyncWorker {
 public:
@@ -99,6 +142,8 @@ Napi::Object MpqArchive::Init(Napi::Env env, Napi::Object exports) {
     InstanceMethod("SFileFlushArchive", &MpqArchive::Flush),
     InstanceMethod("SFileCompactArchive", &MpqArchive::Compact),
     InstanceMethod("SFileOpenFileEx", &MpqArchive::OpenFile),
+    InstanceMethod("SFileOpenFileArchive", &MpqArchive::OpenFileArchive),
+    InstanceMethod("openFileArchiveAsync", &MpqArchive::OpenFileArchiveAsync),
     InstanceMethod("SFileHasFile", &MpqArchive::HasFile),
     InstanceMethod("SFileExtractFile", &MpqArchive::ExtractFile),
     InstanceMethod("SFileAddFile", &MpqArchive::AddFile),
@@ -144,11 +189,21 @@ MpqArchive::MpqArchive(const Napi::CallbackInfo& info)
 }
 
 MpqArchive::~MpqArchive() {
-  if (isOpen && hMpq) {
+  if (isOpen && hMpq && owned) {
     SFileCloseArchive(hMpq);
-    hMpq = nullptr;
-    isOpen = false;
   }
+  hMpq = nullptr;
+  isOpen = false;
+}
+
+Napi::Object MpqArchive::NewInstance(Napi::Env env, HANDLE hMpq, bool owned) {
+  Napi::EscapableHandleScope scope(env);
+  Napi::Object obj = constructor.New({});
+  MpqArchive* archive = Napi::ObjectWrap<MpqArchive>::Unwrap(obj);
+  archive->hMpq = hMpq;
+  archive->isOpen = true;
+  archive->owned = owned;
+  return scope.Escape(napi_value(obj)).ToObject();
 }
 
 Napi::Value MpqArchive::Open(const Napi::CallbackInfo& info) {
@@ -253,11 +308,11 @@ Napi::Value MpqArchive::Close(const Napi::CallbackInfo& info) {
     return Napi::Boolean::New(env, false);
   }
 
-  if (hMpq) {
+  if (hMpq && owned) {
     SFileCloseArchive(hMpq);
-    hMpq = nullptr;
-    isOpen = false;
   }
+  hMpq = nullptr;
+  isOpen = false;
 
   return Napi::Boolean::New(env, true);
 }
@@ -293,6 +348,77 @@ Napi::Value MpqArchive::OpenFile(const Napi::CallbackInfo& info) {
   // Create an MpqFile object
   Napi::Object fileObj = MpqFile::NewInstance(env, hFile);
   return fileObj;
+}
+
+Napi::Value MpqArchive::OpenFileArchive(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    Napi::TypeError::New(env, "Expected filename as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  std::string fileName = info[0].As<Napi::String>().Utf8Value();
+  DWORD priority = 0;
+  DWORD flags = 0;
+
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    priority = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  if (info.Length() > 2 && info[2].IsNumber()) {
+    flags = info[2].As<Napi::Number>().Uint32Value();
+  }
+
+  HANDLE hNestedMpq;
+  if (!SFileOpenFileArchive(hMpq, fileName.c_str(), priority, flags, &hNestedMpq)) {
+    ThrowStormError(env, "Failed to open nested MPQ archive: " + fileName);
+    return env.Null();
+  }
+
+  // The nested archive is a genuinely new, independently-owned handle.
+  return MpqArchive::NewInstance(env, hNestedMpq, true);
+}
+
+Napi::Value MpqArchive::OpenFileArchiveAsync(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hMpq) {
+    Napi::Error::New(env, "Archive is not open")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  if (info.Length() < 1 || !info[0].IsString()) {
+    Napi::TypeError::New(env, "Expected filename as first argument")
+      .ThrowAsJavaScriptException();
+    return env.Undefined();
+  }
+
+  std::string fileName = info[0].As<Napi::String>().Utf8Value();
+  DWORD priority = 0;
+  DWORD flags = 0;
+
+  if (info.Length() > 1 && info[1].IsNumber()) {
+    priority = info[1].As<Napi::Number>().Uint32Value();
+  }
+
+  if (info.Length() > 2 && info[2].IsNumber()) {
+    flags = info[2].As<Napi::Number>().Uint32Value();
+  }
+
+  auto* worker = new OpenFileArchiveWorker(env, info.This().As<Napi::Object>(), hMpq,
+                                           std::move(fileName), priority, flags);
+  Napi::Promise promise = worker->Promise();
+  worker->Queue();
+  return promise;
 }
 
 Napi::Value MpqArchive::HasFile(const Napi::CallbackInfo& info) {

@@ -1,4 +1,5 @@
 #include "file.h"
+#include "archive.h"
 #include "errors.h"
 #include <vector>
 
@@ -63,6 +64,7 @@ Napi::Object MpqFile::Init(Napi::Env env, Napi::Object exports) {
     InstanceMethod("SFileGetFileName", &MpqFile::GetFileName),
     InstanceMethod("SFileSetFileLocale", &MpqFile::SetLocale),
     InstanceMethod("SFileGetFileInfo", &MpqFile::GetFileInfo),
+    InstanceMethod("SFileGetFileArchive", &MpqFile::GetFileArchive),
     InstanceMethod("SFileCloseFile", &MpqFile::Close)
   });
 
@@ -352,5 +354,25 @@ Napi::Value MpqFile::GetFileInfo(const Napi::CallbackInfo& info) {
   }
 
   return Napi::Buffer<uint8_t>::Copy(env, buffer.data(), lengthNeeded);
+}
+
+Napi::Value MpqFile::GetFileArchive(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+
+  if (!isOpen || !hFile) {
+    Napi::Error::New(env, "File is not open")
+      .ThrowAsJavaScriptException();
+    return env.Null();
+  }
+
+  HANDLE hMpq;
+  if (!SFileGetFileArchive(hFile, &hMpq)) {
+    ThrowStormError(env, "Failed to get the archive that owns this file");
+    return env.Null();
+  }
+
+  // Borrowed handle: it belongs to whichever Archive originally opened it
+  // (or a patch archive in its chain), so this wrapper must never close it.
+  return MpqArchive::NewInstance(env, hMpq, false);
 }
 

@@ -1,6 +1,7 @@
 import { MPQFile } from './bindings';
 import { invoke, invokeAsync } from './errors';
 import { kDispose } from './dispose';
+import { Archive } from './archive';
 
 /**
  * StormLib File wrapper class
@@ -119,6 +120,20 @@ export class File {
    */
   getFileInfo(infoClass: number): Buffer | null {
     return invoke(() => this.file.SFileGetFileInfo(infoClass));
+  }
+
+  /**
+   * Get the archive that owns this open file.
+   *
+   * The returned Archive is a *borrowed* reference: it shares the
+   * underlying handle with whichever archive originally served this file
+   * (the archive it was opened from, or a patch archive in its chain).
+   * Its `close()` is a safe no-op — the handle stays owned by the
+   * original opener and is unaffected either way.
+   */
+  getArchive(): Archive {
+    const archive = invoke(() => this.file.SFileGetFileArchive());
+    return new Archive(archive);
   }
 
   /**

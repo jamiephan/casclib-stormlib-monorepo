@@ -32,6 +32,8 @@ export interface MPQArchive {
 
   // File operations
   SFileOpenFileEx(filename: string, flags: number): MPQFile;
+  SFileOpenFileArchive(fileName: string, priority: number, flags: number): MPQArchive;
+  openFileArchiveAsync(fileName: string, priority: number, flags: number): Promise<MPQArchive>;
   SFileHasFile(filename: string): boolean;
   SFileExtractFile(source: string, destination: string): boolean;
   SFileAddFile(sourcePath: string, archiveName: string, flags?: number): boolean;
@@ -110,6 +112,7 @@ export interface MPQFile {
   SFileGetFileName(): string;
   SFileSetFileLocale(locale: number): boolean;
   SFileGetFileInfo(infoClass: number): Buffer | null;
+  SFileGetFileArchive(): MPQArchive;
   SFileCloseFile(): boolean;
 }
 
