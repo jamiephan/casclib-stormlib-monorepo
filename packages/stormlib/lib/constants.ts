@@ -4,8 +4,8 @@
  */
 
 // StormLib Version
-export const STORMLIB_VERSION = 0x091F;
-export const STORMLIB_VERSION_STRING = '9.31';
+export const STORMLIB_VERSION = 0x0928;
+export const STORMLIB_VERSION_STRING = '9.40';
 
 // Archive IDs
 export const ID_MPQ = 0x1A51504D;
@@ -113,7 +113,8 @@ export const MPQ_ATTRIBUTE_ALL = 0x0000000F;
 // Base provider flags
 export const BASE_PROVIDER_FILE = 0x00000000;
 export const BASE_PROVIDER_MAP = 0x00000001;
-export const BASE_PROVIDER_HTTP = 0x00000002;
+export const BASE_PROVIDER_MPQ = 0x00000002;
+export const BASE_PROVIDER_HTTP = 0x00000003;
 export const BASE_PROVIDER_MASK = 0x0000000F;
 
 // Stream provider flags
@@ -259,7 +260,8 @@ export enum SFileInfoClass {
   InfoFlags = 53,
   InfoEncryptionKey = 54,
   InfoEncryptionKeyRaw = 55,
-  InfoCRC32 = 56
+  InfoCRC32 = 56,
+  InfoMD5 = 57
 }
 
 // Locale constants

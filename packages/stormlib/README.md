@@ -1269,8 +1269,8 @@ The `FileInfo` interface is returned by `archive.findFiles()` and `archive.listF
 The library exports all StormLib constants. Here are the most commonly used:
 
 ### StormLib Version
-- `STORMLIB_VERSION`: Version number (0x091F)
-- `STORMLIB_VERSION_STRING`: Version string ("9.31")
+- `STORMLIB_VERSION`: Version number (0x0928)
+- `STORMLIB_VERSION_STRING`: Version string ("9.40")
 
 ### Error Codes
 - `ERROR_AVI_FILE`: File is AVI, not MPQ (10000)
