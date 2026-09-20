@@ -77,3 +77,25 @@ describe("StormError", () => {
     });
   });
 });
+
+describe("dispose.ts Symbol.dispose polyfill", () => {
+  it("defines Symbol.dispose when the runtime doesn't already have it", () => {
+    // Symbol.dispose itself is a non-configurable, non-writable property on
+    // the real Symbol object, so it cannot be deleted to simulate an older
+    // runtime. Swap the global Symbol binding (which IS writable) for a
+    // stand-in that lacks .dispose instead.
+    const RealSymbol = (globalThis as any).Symbol;
+    const fakeSymbol: any = (...args: unknown[]) => RealSymbol(...args);
+    fakeSymbol.for = RealSymbol.for.bind(RealSymbol);
+    (globalThis as any).Symbol = fakeSymbol;
+    jest.resetModules();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { kDispose } = require("../lib/dispose");
+      expect(fakeSymbol.dispose).toBe(kDispose);
+    } finally {
+      (globalThis as any).Symbol = RealSymbol;
+      jest.resetModules();
+    }
+  });
+});

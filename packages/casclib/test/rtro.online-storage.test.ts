@@ -79,6 +79,31 @@ describe("CascLib - Blizzard Arcade Collection Retail (rtro)", () => {
         storage.findClose();
       }
     });
+
+    // The online storage was already fully downloaded into TEMP_DIR by the
+    // beforeAll above, so TEMP_DIR itself is now a complete, valid local CASC
+    // storage directory. Reopening it directly (no CDN params) exercises the
+    // success paths of open()/openAsync()/openEx() without any extra network
+    // access — those paths are otherwise only reachable with real CASC data.
+    describe("reopening the downloaded cache as a local storage", () => {
+      it("Storage.open() / instance open() succeed for a real local storage", () => {
+        const local = Storage.open(TEMP_DIR);
+        expect(local.isOpen).toBe(true);
+        local.close();
+      });
+
+      it("Storage.openAsync() / instance openAsync() succeed for a real local storage", async () => {
+        const local = await Storage.openAsync(TEMP_DIR);
+        expect(local.isOpen).toBe(true);
+        local.close();
+      });
+
+      it("Storage.openEx() / instance openEx() succeed for a real local storage", () => {
+        const local = Storage.openEx(TEMP_DIR);
+        expect(local.isOpen).toBe(true);
+        local.close();
+      });
+    });
   });
 
   describe("CascStorage", () => {

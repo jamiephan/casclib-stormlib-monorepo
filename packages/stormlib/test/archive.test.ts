@@ -297,6 +297,30 @@ describe("File.read()", () => {
     file.close();
     archive.close();
   });
+
+  it("should default bytesToRead to 4096 when omitted", () => {
+    const testDir = getTestDir("file-read-default");
+    ensureDir(testDir);
+    // SFileReadFile errors (ERROR_HANDLE_EOF) if asked to read past the end
+    // of the file, so the content must be at least 4096 bytes for the
+    // default read size to succeed.
+    const longContent = "0123456789".repeat(500);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, longContent);
+    const archivePath = path.join(testDir, "test.mpq");
+    const archive = new Archive();
+    archive.create(archivePath);
+    archive.addFile(sourceFile, "test.txt");
+    archive.close();
+
+    archive.open(archivePath);
+    const file = archive.openFile("test.txt");
+    const data = file.read();
+    expect(data.length).toBe(4096);
+    expect(data.toString()).toBe(longContent.slice(0, 4096));
+    file.close();
+    archive.close();
+  });
 });
 
 describe("File.readAll()", () => {
@@ -619,6 +643,23 @@ describe("Archive.addFileEx()", () => {
     expect(archive.readFileAsString("routed.txt")).toBe(content);
     archive.close();
   });
+
+  it("routes through SFileAddFileEx defaulting omitted flags/compression to 0", () => {
+    const testDir = getTestDir("addfile-compression-defaults");
+    ensureDir(testDir);
+    const sourceFile = path.join(testDir, "source.txt");
+    createTestFile(sourceFile, "content");
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+
+    // Only compressionNext is set, so the routing condition is met while
+    // `flags` and `compression` both fall back to their `|| 0` defaults.
+    const result = archive.addFile(sourceFile, "defaults.txt", {
+      compressionNext: 0x02 // MPQ_COMPRESSION_ZLIB
+    });
+    expect(result).toBe(true);
+    archive.close();
+  });
 });
 
 describe("Archive.setAttributes()", () => {
@@ -748,7 +789,24 @@ describe("Archive.listFiles()", () => {
     expect(typeof file?.compSize).toBe("number");
     expect(typeof file?.fileFlags).toBe("number");
     expect(typeof file?.locale).toBe("number");
-    
+
+    archive.close();
+  });
+
+  it("should return an empty array when SFileFindFirstFile finds nothing (no files at all)", () => {
+    // A freshly created archive with no files added has nothing for "*" to
+    // match, so SFileFindFirstFile returns null — exercising the `|| []`
+    // fallbacks in listFiles()/files()/findFiles()'s default mask argument.
+    const testDir = getTestDir("listfiles-empty");
+    ensureDir(testDir);
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+
+    expect(archive.findFiles()).toBeNull();
+    expect(archive.listFiles()).toEqual([]);
+    expect([...archive.files()]).toEqual([]);
+    expect(archive.getFileNames()).toEqual([]);
+
     archive.close();
   });
 });
@@ -1061,6 +1119,19 @@ describe("Archive utility methods", () => {
     expect(ratio).toBeGreaterThan(0);
     // Note: Compression ratio can be > 1 for small files where compression overhead exceeds savings
     
+    archive.close();
+  });
+
+  it("getTotalSize()/getTotalCompressedSize()/getCompressionRatio() are 0 for an empty archive", () => {
+    const testDir = getTestDir("get-total-size-empty");
+    ensureDir(testDir);
+    const archive = new Archive();
+    archive.create(path.join(testDir, "test.mpq"));
+
+    expect(archive.getTotalSize()).toBe(0);
+    expect(archive.getTotalCompressedSize()).toBe(0);
+    expect(archive.getCompressionRatio()).toBe(0);
+
     archive.close();
   });
 
