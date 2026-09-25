@@ -8,6 +8,9 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "stormlib": "dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -38,6 +41,7 @@
   "author": "jamiephan",
   "license": "MIT",
   "dependencies": {
+    "commander": "^12.1.0",
     "node-addon-api": "^8.9.2",
     "node-gyp-build": "^4.8.0"
   },

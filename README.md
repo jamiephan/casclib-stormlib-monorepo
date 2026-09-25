@@ -13,6 +13,18 @@ A monorepo containing Node.js native bindings for [**CascLib**](https://github.c
 - **[@jamiephan/stormlib](https://www.npmjs.com/package/@jamiephan/stormlib)** - Native bindings for StormLib (MPQ archives from classic Blizzard games) 
   - [./packages/stormlib](./packages/stormlib)
 
+## Command Line
+
+Both packages include CLIs that can be run as a `npx` command.
+
+```bash
+npx @jamiephan/casclib --help
+npx @jamiephan/stormlib --help
+```
+
+See the [CASC CLI reference](packages/casclib/README.md#command-line) and
+[MPQ CLI reference](packages/stormlib/README.md#command-line) for options and examples.
+
 ## 📄 License
 
 MIT

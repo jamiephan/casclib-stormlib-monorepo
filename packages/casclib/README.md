@@ -30,6 +30,40 @@ Any game using CASC storage format, including but not limited to:
 - Starcraft II
 - Warcraft III: Reforged
 
+## Command Line
+
+If you wish to use the command line interface instead of the library, you can run the following commands. Skip this section if you only intend to use the library programmatically.
+
+```bash
+npx @jamiephan/casclib --help
+npx @jamiephan/casclib info "/path/to/HeroesData"
+npx @jamiephan/casclib list "/path/to/HeroesData" --mask "*.xml" --json
+npx @jamiephan/casclib cat "/path/to/HeroesData" "mods/core.stormmod/base.stormdata/DataBuildId.txt"
+npx @jamiephan/casclib extract "/path/to/HeroesData" "mods/core.stormmod/base.stormdata/DataBuildId.txt" ./DataBuildId.txt
+```
+
+| Command | Output / behavior |
+| --- | --- |
+| `info <storage>` | Product metadata and total file count as JSON |
+| `list <storage>` | File names, one per line; `--json` returns an array of `{ name, size }` |
+| `cat <storage> <file>` | Raw file bytes on stdout, with no added newline |
+| `extract <storage> <file> <destination>` | Writes one file to an explicit new output path |
+
+Every command accepts `--online` to open a connection string in the format
+`cache*product[*region]` instead of a local storage path. Online access downloads
+data from Blizzard's CDN and can take several minutes:
+
+```bash
+npx @jamiephan/casclib info "./casc-cache*hero*us" --online
+npx @jamiephan/casclib list "./casc-cache*hero*us" --online --mask "*.xml"
+```
+
+`list` accepts `-m, --mask <pattern>` (default `*`) and `--listfile <path>` for an
+external listfile. Quote wildcard masks and connection strings to prevent shell
+expansion. Available file names depend on the storage and any supplied listfile.
+
+Note: When installed globally (using `npm install -g @jamiephan/casclib`), the executable is named `casclib`.
+
 ## Installation
 
 ```bash

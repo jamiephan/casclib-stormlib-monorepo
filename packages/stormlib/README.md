@@ -32,6 +32,50 @@ Any game using MPQ archive format, including but not limited to:
 - World of Warcraft (classic)
 - Heroes of the Storm
 
+## Command Line
+
+If you wish to use the command line interface instead of the library, you can run the following commands. Skip this section if you only intend to use the library programmatically.
+
+```bash
+npx @jamiephan/stormlib --help
+npx @jamiephan/stormlib info ./war3map.w3x
+npx @jamiephan/stormlib list ./war3map.w3x --mask "*.j" --json
+npx @jamiephan/stormlib cat ./war3map.w3x war3map.j
+npx @jamiephan/stormlib extract ./war3map.w3x war3map.j ./war3map.j
+```
+
+| Command | Output / behavior |
+| --- | --- |
+| `info <archive>` | Enumerated file count, total uncompressed size, and compressed size as JSON |
+| `list <archive>` | File names, one per line; `--json` returns an array of `{ name, size }` |
+| `cat <archive> <file>` | Raw file bytes on stdout, with no added newline |
+| `extract <archive> <file> <destination>` | Writes one file to an explicit new output path |
+| `create <archive>` | Creates a new empty MPQ with an internal listfile; rejects an existing path |
+| `add <archive> <source> <name>` | Adds a disk file with zlib compression; `--replace` permits replacing an entry |
+| `remove <archive> <file>` | Removes an archive entry |
+
+Create and modify an archive:
+
+```bash
+npx @jamiephan/stormlib create ./data.mpq
+npx @jamiephan/stormlib add ./data.mpq ./config.json config.json
+npx @jamiephan/stormlib add ./data.mpq ./updated-config.json config.json --replace
+npx @jamiephan/stormlib remove ./data.mpq config.json
+```
+
+`list` accepts `-m, --mask <pattern>` (default `*`). Quote wildcard masks and paths
+containing spaces. Listings and `info` totals reflect entries StormLib can
+enumerate, including internal entries such as `(listfile)`.
+
+Read commands open the archive read-only. Extraction never overwrites existing
+files; the destination's parent directory must already exist. `cat` and `extract`
+read the selected file into memory, so memory usage scales with its size. Prefer
+`extract` for binary files when using shells that may transform redirected stdout.
+Errors go to stderr with a nonzero exit status. Use `<command> --help` for
+command-specific help or `--version` for the package version.
+
+Note: When installed globally (using `npm install -g @jamiephan/stormlib`), the executable is named `stormlib`.
+
 ## Installation
 
 ```bash
