@@ -1,5 +1,10 @@
 # @jamiephan/casclib
 
+[![NPM Version](https://img.shields.io/npm/v/%40jamiephan%2Fcasclib?logo=npm&label=%40jamiephan%2Fcasclib)](https://www.npmjs.com/package/@jamiephan/casclib)
+[![NPM Last Update](https://img.shields.io/npm/last-update/%40jamiephan%2Fcasclib?logo=npm&label=%40jamiephan%2Fcasclib)](https://www.npmjs.com/package/@jamiephan/casclib)
+[![NPM Type Definitions](https://img.shields.io/npm/types/%40jamiephan%2Fcasclib?logo=npm&label=%40jamiephan%2Fcasclib)](https://www.npmjs.com/package/@jamiephan/casclib)
+[![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/%40jamiephan%2Fcasclib?logo=npm&label=%40jamiephan%2Fcasclib)](https://www.npmjs.com/package/@jamiephan/casclib)
+
 Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib) - A library to read CASC (Content Addressable Storage Container) from modern Blizzard games.
 
 ## Features
@@ -17,7 +22,7 @@ Node.js native bindings for [CascLib](https://github.com/ladislav-zezula/CascLib
 
 ## Supported Games
 
-Any game using CASC storage format, including:
+Any game using CASC storage format, including but not limited to:
 - Heroes of the Storm
 - World of Warcraft
 - Diablo III & IV

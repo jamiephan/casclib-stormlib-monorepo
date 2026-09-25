@@ -1,5 +1,10 @@
 # @jamiephan/stormlib
 
+[![NPM Version](https://img.shields.io/npm/v/%40jamiephan%2Fstormlib?logo=npm&label=%40jamiephan%2Fstormlib)](https://www.npmjs.com/package/@jamiephan/stormlib)
+[![NPM Last Update](https://img.shields.io/npm/last-update/%40jamiephan%2Fstormlib?logo=npm&label=%40jamiephan%2Fstormlib)](https://www.npmjs.com/package/@jamiephan/stormlib)
+[![NPM Type Definitions](https://img.shields.io/npm/types/%40jamiephan%2Fstormlib?logo=npm&label=%40jamiephan%2Fstormlib)](https://www.npmjs.com/package/@jamiephan/stormlib)
+[![NPM Unpacked Size](https://img.shields.io/npm/unpacked-size/%40jamiephan%2Fstormlib?logo=npm&label=%40jamiephan%2Fstormlib)](https://www.npmjs.com/package/@jamiephan/stormlib)
+
 Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormLib) - A library to read and write MPQ (Mo'PaQ) archives from Blizzard games.
 
 ## Features
@@ -19,12 +24,13 @@ Node.js native bindings for [StormLib](https://github.com/ladislav-zezula/StormL
 
 ## Supported Games
 
-Any game using MPQ archive format, including:
+Any game using MPQ archive format, including but not limited to:
 - Warcraft III (pre-Reforged)
 - Starcraft & Starcraft: Brood War
-- Starcraft II (legacy)
+- Starcraft II
 - Diablo II
 - World of Warcraft (classic)
+- Heroes of the Storm
 
 ## Installation
 
