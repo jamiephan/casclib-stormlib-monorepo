@@ -69,17 +69,6 @@
           }
         ],
         [
-          "OS!='win'",
-          {
-            # CascPort.h's non-Windows typedefs omit LPDWORD, but upstream
-            # CascFiles.cpp (LoadBuildNumber) uses it. Remove once upstream
-            # adds the typedef.
-            "defines": [
-              "LPDWORD=DWORD*"
-            ]
-          }
-        ],
-        [
           "OS=='linux'",
           {
             "cflags_cc": [
