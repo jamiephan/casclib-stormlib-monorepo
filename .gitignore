@@ -70,3 +70,5 @@ test-data/
 
 # Jest coverage report
 packages/*/report.json 
+# Vendored upstream sources copied in at pack time (scripts/vendor-thirdparty.js)
+packages/*/deps/

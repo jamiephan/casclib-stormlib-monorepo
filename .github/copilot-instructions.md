@@ -26,6 +26,7 @@ thirdparty/
   StormLib/         # Git submodule - C++ library sources
 scripts/
   generate-esm.js   # Creates ESM wrappers for dual-format exports
+  vendor-thirdparty.js # prepack: copies thirdparty/<Lib>/src into packages/*/deps/ for source builds from npm
 ```
 
 ### Build Process (Critical!)

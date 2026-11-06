@@ -9,7 +9,7 @@ pnpm monorepo (`pnpm-workspace.yaml` → `packages/*`) shipping Node.js N-API bi
 - `@jamiephan/casclib` — CASC storage (modern Blizzard: WoW, D3/D4, Overwatch, SC2, HotS, WC3 Reforged)
 - `@jamiephan/stormlib` — MPQ archives (classic Blizzard)
 
-Upstream C++ sources are git submodules at `thirdparty/CascLib` and `thirdparty/StormLib`. They are **compiled directly** by each package's `binding.gyp` (no prebuilt static lib) — every `.cpp` from upstream is listed explicitly.
+Upstream C++ sources are git submodules at `thirdparty/CascLib` and `thirdparty/StormLib`. They are **compiled directly** by each package's `binding.gyp` (no prebuilt static lib) — every `.cpp` from upstream is listed explicitly. Paths go through the `lib_root` gyp variable, which resolves to `../../thirdparty/<Lib>` in the monorepo or `deps/<Lib>` in the published package. The `prepack` script (`scripts/vendor-thirdparty.js`) copies the submodule's `src/` + `LICENSE` into `packages/*/deps/` (gitignored) so the npm tarball can be compiled from source (Electron rebuilds, platforms without prebuilds).
 
 ## Setup
 
